@@ -20,23 +20,13 @@ const Navbar = () => {
 
         {/* Menú desktop */}
         <nav className="navbar-menu hidden md:flex space-x-8 items-center">
-          <Link to="/" className="text-black font-semibold hover:text-orange-500 transition">
-            Inicio
-          </Link>
-          <Link to="/productos" className="text-black font-semibold hover:text-orange-500 transition">
-            Productos
-          </Link>
-          <Link to="/contacto" className="text-black font-semibold hover:text-orange-500 transition">
-            Contacto
-          </Link>
-          <Link to="/login" className="text-black font-semibold hover:text-orange-500 transition">
-            Ingresar
-          </Link>
-          {/* Ícono perfil usuario */}
+          <Link to="/" className="text-black font-semibold hover:text-orange-500 transition">Inicio</Link>
+          <Link to="/productos" className="text-black font-semibold hover:text-orange-500 transition">Productos</Link>
+          <Link to="/contacto" className="text-black font-semibold hover:text-orange-500 transition">Contacto</Link>
+          <Link to="/login" className="text-black font-semibold hover:text-orange-500 transition">Ingresar</Link>
           <Link to="/perfil" className="text-black hover:text-orange-500 transition text-2xl ml-4" title="Perfil">
             <i className="fas fa-user-circle"></i>
           </Link>
-          {/* Ícono carrito */}
           <Link to="/cart" className="text-black hover:text-orange-500 transition text-2xl ml-4" title="Carrito">
             <i className="fab fa-opencart"></i>
           </Link>
@@ -47,36 +37,17 @@ const Navbar = () => {
       {sidebarOpen && (
         <nav className="md:hidden bg-white shadow-lg p-4 absolute top-full left-0 w-full border-t border-gray-300">
           <ul className="flex flex-col space-y-4 text-center">
-            <li>
-              <Link to="/" onClick={() => setSidebarOpen(false)} className="block text-black font-semibold hover:text-orange-600">
-                Inicio
-              </Link>
-            </li>
-            <li>
-              <Link to="/productos" onClick={() => setSidebarOpen(false)} className="block text-black font-semibold hover:text-orange-600">
-                Productos
-              </Link>
-            </li>
-            <li>
-              <Link to="/contacto" onClick={() => setSidebarOpen(false)} className="block text-black font-semibold hover:text-orange-600">
-                Contacto
-              </Link>
-            </li>
-            <li>
-              <Link to="/login" onClick={() => setSidebarOpen(false)} className="block text-black font-semibold hover:text-orange-600">
-                Ingresar
-              </Link>
-            </li>
-            <li>
-              <Link to="/perfil" onClick={() => setSidebarOpen(false)} className="block text-black font-semibold hover:text-orange-600">
-                Perfil
-              </Link>
-            </li>
-            <li>
-              <Link to="/cart" onClick={() => setSidebarOpen(false)} className="block text-black font-semibold hover:text-orange-600">
-                Carrito
-              </Link>
-            </li>
+            {['Inicio', 'Productos', 'Contacto', 'Ingresar', 'Perfil', 'Carrito'].map((item) => (
+              <li key={item}>
+                <Link
+                  to={`/${item.toLowerCase() === 'inicio' ? '' : item.toLowerCase()}`}
+                  onClick={() => setSidebarOpen(false)}
+                  className="block text-black font-semibold hover:text-orange-600"
+                >
+                  {item}
+                </Link>
+              </li>
+            ))}
           </ul>
         </nav>
       )}

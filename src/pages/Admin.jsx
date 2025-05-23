@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const Admin = () => {
   const [producto, setProducto] = useState({
@@ -7,7 +9,7 @@ const Admin = () => {
     descripcion: '',
     imagen_url: '',
     estado: 'activo',
-    categoria_nombre: '', // para selección en frontend
+    categoria_nombre: '',
   });
 
   const [detalles, setDetalles] = useState([
@@ -20,14 +22,18 @@ const Admin = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      const [marcasRes, tallasRes, categoriasRes] = await Promise.all([
-        axios.get('http://localhost:3000/api/admin/marcas', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }),
-        axios.get('http://localhost:3000/api/admin/tallas', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }),
-        axios.get('http://localhost:3000/api/admin/categorias', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }),
-      ]);
-      setMarcas(marcasRes.data);
-      setTallas(tallasRes.data);
-      setCategorias(categoriasRes.data);
+      try {
+        const [marcasRes, tallasRes, categoriasRes] = await Promise.all([
+          axios.get('http://localhost:3000/api/admin/marcas', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }),
+          axios.get('http://localhost:3000/api/admin/tallas', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }),
+          axios.get('http://localhost:3000/api/admin/categorias', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }),
+        ]);
+        setMarcas(marcasRes.data);
+        setTallas(tallasRes.data);
+        setCategorias(categoriasRes.data);
+      } catch (error) {
+        toast.error('Error al cargar marcas, tallas o categorías');
+      }
     };
     fetchData();
   }, []);
@@ -42,12 +48,49 @@ const Admin = () => {
     setDetalles(newDetalles);
   };
 
-  const imagenPreview = producto.imagen_url ? (
-    <img src={producto.imagen_url} alt="Vista previa" className="mb-4 max-h-64 object-contain" />
-  ) : null;
+  const validarForm = () => {
+    if (!producto.nombre.trim()) {
+      toast.error('El nombre del producto es obligatorio');
+      return false;
+    }
+    if (!producto.descripcion.trim()) {
+      toast.error('La descripción es obligatoria');
+      return false;
+    }
+    if (producto.imagen_url && !/^https?:\/\/.+\.(jpg|jpeg|png|gif)$/i.test(producto.imagen_url)) {
+      toast.error('La URL de la imagen no es válida');
+      return false;
+    }
+    if (!producto.categoria_nombre) {
+      toast.error('Selecciona una categoría');
+      return false;
+    }
+    for (let i = 0; i < detalles.length; i++) {
+      const d = detalles[i];
+      if (!d.marca_nombre) {
+        toast.error(`Selecciona la marca en detalle ${i + 1}`);
+        return false;
+      }
+      if (!d.talla_nombre) {
+        toast.error(`Selecciona la talla en detalle ${i + 1}`);
+        return false;
+      }
+      if (!d.precio || isNaN(d.precio) || Number(d.precio) <= 0) {
+        toast.error(`Precio inválido en detalle ${i + 1}`);
+        return false;
+      }
+      if (!d.stock || isNaN(d.stock) || Number(d.stock) < 0) {
+        toast.error(`Stock inválido en detalle ${i + 1}`);
+        return false;
+      }
+    }
+    return true;
+  };
 
   const handleSubmit = async e => {
     e.preventDefault();
+
+    if (!validarForm()) return;
 
     // Convertir nombres a IDs
     const marcaIdPorNombre = nombre => {
@@ -63,14 +106,12 @@ const Admin = () => {
       return c ? c.id_categoria : null;
     };
 
-    // Validar categoría válida
     const categoriaId = categoriaIdPorNombre(producto.categoria_nombre);
     if (!categoriaId) {
-      alert('Selecciona una categoría válida');
+      toast.error('Categoría inválida');
       return;
     }
 
-    // Mapear detalles a IDs
     const detallesConIds = detalles.map(d => ({
       marca_id: marcaIdPorNombre(d.marca_nombre),
       talla_id: tallaIdPorNombre(d.talla_nombre),
@@ -89,107 +130,119 @@ const Admin = () => {
       }, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
-      alert('Producto agregado correctamente');
-      // Resetear si quieres:
-      setProducto({
-        nombre: '',
-        descripcion: '',
-        imagen_url: '',
-        estado: 'activo',
-        categoria_nombre: '',
-      });
+      toast.success('Producto agregado correctamente');
+      setProducto({ nombre: '', descripcion: '', imagen_url: '', estado: 'activo', categoria_nombre: '' });
       setDetalles([{ marca_nombre: '', talla_nombre: '', precio: '', stock: '' }]);
     } catch (err) {
-      alert('Error al agregar producto: ' + err.response?.data?.error || err.message);
+      toast.error('Error al agregar producto: ' + (err.response?.data?.error || err.message));
     }
   };
 
+  const imagenPreview = producto.imagen_url ? (
+    <img src={producto.imagen_url} alt="Vista previa" className="mb-4 max-h-64 object-contain" />
+  ) : null;
+
   return (
-    <form onSubmit={handleSubmit} className="p-6 max-w-2xl mx-auto">
-      <h2 className="text-2xl font-bold mb-4">Agregar Producto</h2>
+    <>
+      <form onSubmit={handleSubmit} className="p-6 max-w-2xl mx-auto">
+        <h2 className="text-2xl font-bold mb-4">Agregar Producto</h2>
 
-      <input name="nombre" placeholder="Nombre" value={producto.nombre} onChange={handleProductoChange} className="block w-full p-2 mb-2 border" required />
-      <textarea name="descripcion" placeholder="Descripción" value={producto.descripcion} onChange={handleProductoChange} className="block w-full p-2 mb-2 border" required />
-      
-      <input name="imagen_url" placeholder="URL de imagen" value={producto.imagen_url} onChange={handleProductoChange} className="block w-full p-2 mb-2 border" />
-      {imagenPreview}
+        <input
+          name="nombre"
+          placeholder="Nombre"
+          value={producto.nombre}
+          onChange={handleProductoChange}
+          className="block w-full p-2 mb-2 border"
+          required
+        />
+        <textarea
+          name="descripcion"
+          placeholder="Descripción"
+          value={producto.descripcion}
+          onChange={handleProductoChange}
+          className="block w-full p-2 mb-2 border"
+          required
+        />
+        <input
+          name="imagen_url"
+          placeholder="URL de imagen"
+          value={producto.imagen_url}
+          onChange={handleProductoChange}
+          className="block w-full p-2 mb-2 border"
+        />
+        {imagenPreview}
+        <select
+          name="categoria_nombre"
+          value={producto.categoria_nombre}
+          onChange={handleProductoChange}
+          className="block w-full p-2 mb-2 border"
+          required
+        >
+          <option value="">Selecciona Categoría</option>
+          {categorias.map(c => (
+            <option key={c.id_categoria} value={c.nombre_categoria}>{c.nombre_categoria}</option>
+          ))}
+        </select>
 
-      <select
-        name="categoria_nombre"
-        value={producto.categoria_nombre}
-        onChange={handleProductoChange}
-        required
-        className="block w-full p-2 mb-2 border"
-      >
-        <option value="">Selecciona Categoría</option>
-        {categorias.map(c => (
-          <option key={c.id_categoria} value={c.nombre_categoria}>{c.nombre_categoria}</option>
+        <h3 className="text-lg font-semibold mb-2">Detalles</h3>
+
+        {detalles.map((detalle, index) => (
+          <div key={index} className="mb-4 p-2 border rounded">
+            <select
+              name="marca_nombre"
+              value={detalle.marca_nombre}
+              onChange={e => handleDetalleChange(index, e)}
+              className="block w-full p-1 mb-1 border"
+              required
+            >
+              <option value="">Selecciona Marca</option>
+              {marcas.map(m => (
+                <option key={m.id_marca} value={m.nombre}>{m.nombre}</option>
+              ))}
+            </select>
+
+            <select
+              name="talla_nombre"
+              value={detalle.talla_nombre}
+              onChange={e => handleDetalleChange(index, e)}
+              className="block w-full p-1 mb-1 border"
+              required
+            >
+              <option value="">Selecciona Talla</option>
+              {tallas.map(t => (
+                <option key={t.id_talla} value={t.talla}>{t.talla}</option>
+              ))}
+            </select>
+
+            <input
+              name="precio"
+              placeholder="Precio"
+              type="number"
+              min="0"
+              value={detalle.precio}
+              onChange={e => handleDetalleChange(index, e)}
+              className="block w-full p-1 mb-1 border"
+              required
+            />
+            <input
+              name="stock"
+              placeholder="Stock"
+              type="number"
+              min="0"
+              value={detalle.stock}
+              onChange={e => handleDetalleChange(index, e)}
+              className="block w-full p-1 border"
+              required
+            />
+          </div>
         ))}
-      </select>
 
-      <h3 className="text-lg font-semibold mb-2">Detalles</h3>
 
-      {detalles.map((detalle, index) => (
-        <div key={index} className="mb-4 p-2 border rounded">
-          <select
-            name="marca_nombre"
-            value={detalle.marca_nombre}
-            onChange={e => handleDetalleChange(index, e)}
-            required
-            className="block w-full p-1 mb-1 border"
-          >
-            <option value="">Selecciona Marca</option>
-            {marcas.map(m => (
-              <option key={m.id_marca} value={m.nombre}>{m.nombre}</option>
-            ))}
-          </select>
 
-          <select
-            name="talla_nombre"
-            value={detalle.talla_nombre}
-            onChange={e => handleDetalleChange(index, e)}
-            required
-            className="block w-full p-1 mb-1 border"
-          >
-            <option value="">Selecciona Talla</option>
-            {tallas.map(t => (
-              <option key={t.id_talla} value={t.talla}>{t.talla}</option>
-            ))}
-          </select>
-
-          <input
-            name="precio"
-            placeholder="Precio"
-            type="number"
-            min="0"
-            value={detalle.precio}
-            onChange={e => handleDetalleChange(index, e)}
-            className="block w-full p-1 mb-1 border"
-            required
-          />
-          <input
-            name="stock"
-            placeholder="Stock"
-            type="number"
-            min="0"
-            value={detalle.stock}
-            onChange={e => handleDetalleChange(index, e)}
-            className="block w-full p-1 border"
-            required
-          />
-        </div>
-      ))}
-
-      <button
-        type="button"
-        onClick={() => setDetalles([...detalles, { marca_nombre: '', talla_nombre: '', precio: '', stock: '' }])}
-        className="bg-gray-400 text-white px-3 py-1 mb-4 rounded"
-      >
-        Agregar Detalle
-      </button>
-
-      <button className="bg-green-600 text-white px-4 py-2 rounded">Guardar Producto</button>
-    </form>
+        <button className="bg-green-600 text-white px-4 py-2 rounded">Guardar Producto</button>
+      </form>
+      <ToastContainer position="top-center" autoClose={3000} />
+    </>
   );
 };
 

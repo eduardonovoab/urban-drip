@@ -8,7 +8,7 @@ function App() {
   return (
     <>
       <Navbar />
-      <main className="pt-20 min-h-[80vh] text-white font-sans">
+      <main className="pt-20 min-h-[80vh] bg-white font-sans text-black">
         <AppRoutes />
       </main>
       <Footer />
