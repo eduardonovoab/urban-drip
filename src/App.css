@@ -46,3 +46,33 @@ button:focus-visible {
   /* padding: 2rem; */
   text-align: center;
 }
+/* Dropdown container */
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  min-width: 12rem; /* 192px */
+  z-index: 1000;
+  overflow-y: auto;
+  max-height: 15rem; /* 240px */
+}
+
+/* Dropdown items */
+.dropdown-item {
+  padding: 0.5rem 1rem;
+  color: #000;
+  font-weight: 600;
+  text-decoration: none;
+  display: block;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.dropdown-item:hover {
+  background-color: #f97316; /* naranja */
+  color: white;
+  cursor: pointer;
+}

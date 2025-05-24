@@ -24,7 +24,7 @@ const Admin = () => {
     const fetchData = async () => {
       try {
         const [marcasRes, tallasRes, categoriasRes] = await Promise.all([
-          axios.get('http://localhost:3000/api/admin/marcas', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }),
+          axios.get('http://localhost:3000/api/marcas', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }),
           axios.get('http://localhost:3000/api/admin/tallas', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }),
           axios.get('http://localhost:3000/api/admin/categorias', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }),
         ]);

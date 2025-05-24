@@ -2,7 +2,10 @@ import express from 'express';
 import 
 { listarProductos, 
 listarProductosConDetalles, 
-obtenerMarcas }
+obtenerMarcas,
+listarProductosPorCategoria,
+obtenerCategoriaPorId,
+obtenerCategorias}
  from '../controllers/adminController.js';
 
 const router = express.Router();
@@ -11,5 +14,7 @@ const router = express.Router();
 router.get('/productos', listarProductos);
 router.get('/productos-detalles', listarProductosConDetalles);
 router.get('/marcas', obtenerMarcas);  // Esta es la ruta pública para las marcas
-
+router.get('/productos/categoria/:id', listarProductosPorCategoria);
+router.get('/categorias/:id', obtenerCategoriaPorId);
+router.get('/categorias', obtenerCategorias);
 export default router;

@@ -152,7 +152,36 @@ export const obtenerTallas = async (req, res) => {
     res.status(500).json({ error: 'Error al obtener tallas' });
   }
 };
+export const listarProductosPorCategoria = async (req, res) => {
+  const categoriaId = req.params.id;
 
+  try {
+    const query = `
+      SELECT 
+        p.id_producto, 
+        p.nombre AS nombre_producto, 
+        p.descripcion, 
+        p.imagen_url, 
+        p.estado, 
+        pd.precio,
+        c.nombre_categoria,
+        pd.id_detalle_producto,
+        pd.marca_id,
+        pd.talla_id,
+        pd.stock
+      FROM producto p
+      INNER JOIN categoria c ON p.categoria_id = c.id_categoria
+      INNER JOIN producto_detalle pd ON p.id_producto = pd.producto_id
+      WHERE p.estado = 'activo' AND c.id_categoria = ?;
+    `;
+
+    const [productos] = await pool.query(query, [categoriaId]);
+    res.json(productos);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al obtener productos por categoría' });
+  }
+};
 // Obtener todas las categorías
 export const obtenerCategorias = async (req, res) => {
   try {
@@ -161,6 +190,20 @@ export const obtenerCategorias = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al obtener categorías' });
+  }
+};
+
+export const obtenerCategoriaPorId = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [rows] = await pool.query('SELECT * FROM categoria WHERE id_categoria = ?', [id]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Categoría no encontrada' });
+    }
+    res.json(rows[0]);  // Retorna solo la categoría encontrada
+  } catch (error) {
+    console.error('Error al obtener categoría:', error);
+    res.status(500).json({ error: 'Error al obtener categoría' });
   }
 };
 // Listar productos con detalles y categoría

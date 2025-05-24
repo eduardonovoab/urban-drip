@@ -1,4 +1,6 @@
 /* index.css */
+
+/* Reset básico y estilo general */
 body {
   background: #ffffff;
   font-family: 'Montserrat', sans-serif;
@@ -42,12 +44,8 @@ button:focus-visible {
 #root {
   max-width: 1280px;
   margin: 0 auto;
-  /* quitar padding para evitar problemas de layout con navbar */
-  /* padding: 2rem; */
   text-align: center;
 }
-
-/* Contenedor principal navbar */
 .navbar-container {
   display: flex;
   align-items: center;
@@ -55,6 +53,8 @@ button:focus-visible {
   max-width: 1280px;
   margin: 0 auto;
   padding: 0.75rem 1rem;
+  overflow: visible !important; /* Muy importante */
+  position: relative;
 }
 
 /* Logo */
@@ -68,19 +68,99 @@ button:focus-visible {
 .navbar-menu {
   display: flex;
   gap: 2rem;
+  align-items: center; /* Alinea verticalmente los links y botón */
+  overflow: visible !important;
+  position: static;
 }
 
 /* Links del menú */
-.navbar-menu a {
+.navbar-menu a.nav-link {
   font-weight: 600;
   color: #000; /* texto negro para fondo claro */
+  font-size: 1rem;
+  line-height: 1.5;
+  padding: 0.5rem 0.75rem;
   text-decoration: none;
   transition: color 0.3s;
+  display: inline-block;
+  vertical-align: middle;
 }
 
-.navbar-menu a:hover {
-  color: #f97316; /* color naranja similar a ovachile */
+.navbar-menu a.nav-link:hover {
+  color: #f97316; /* color naranja */
 }
+
+/* Botón Productos con flecha */
+.dropdown-button {
+  font-weight: 600;
+  color: #000;
+  font-size: 1rem;
+  line-height: 1.5;
+  padding: 0.5rem 0.75rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem; /* espacio entre texto y flecha */
+  transition: color 0.3s;
+  vertical-align: middle;
+}
+
+.dropdown-button:hover {
+  color: #f97316;
+}
+
+/* Flecha SVG */
+.dropdown-button svg {
+  margin-top: 0;
+  width: 1rem;
+  height: 1rem;
+  transition: transform 0.2s ease;
+}
+
+/* Flecha gira cuando está abierto */
+.dropdown-button[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+/* Dropdown menu */
+.dropdown-menu {
+  position: absolute;
+  top: 100%;  /* justo debajo del botón */
+  left: 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  min-width: 12rem;
+  z-index: 1000;
+  max-height: 15rem;
+  overflow-y: auto;
+  margin-top: 0.25rem;
+}
+.relative {
+  position: relative; /* Contenedor padre */
+}
+/* Items dropdown */
+.dropdown-item {
+  padding: 0.5rem 1rem;
+  color: #000;
+  font-weight: 600;
+  text-decoration: none;
+  display: block;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.dropdown-item:hover {
+  background-color: #f97316;
+  color: white;
+  cursor: pointer;
+}
+.position-relative {
+  position: relative;
+}
+
 
 /* Ícono carrito */
 .navbar-cart {
@@ -88,4 +168,11 @@ button:focus-visible {
   font-size: 1.5rem;
   color: #000; /* negro para fondo claro */
   cursor: pointer;
+}
+
+/* Menú lateral móvil */
+@media (max-width: 767px) {
+  .navbar-menu {
+    display: none; /* Oculta menú desktop en móvil */
+  }
 }

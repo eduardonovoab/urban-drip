@@ -1,21 +1,20 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 
-// Páginas públicas
 import Home from '../pages/Home';
 import Login from '../pages/Login';
 import Register from '../pages/Register';
 import NotFound from '../pages/NotFound';
 
-// Páginas protegidas
 import Cliente from '../pages/Cliente';
 import AdminDashboard from '../pages/Admin';
 import AdminProductList from '../pages/AdminProductList';
 import Cart from '../pages/Cart';
 import EditarProducto from '../pages/EditarProducto';
 
-// Protección de rutas
 import ProtectedRoute from './ProtectedRoute';
+
+import ProductosPorCategoria from '../components/ProductosPorCategoria';
 
 const AppRoutes = () => {
   return (
@@ -24,6 +23,10 @@ const AppRoutes = () => {
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      
+      <Route path="/productos/categoria/:id" element={<ProductosPorCategoria />} />
+
+      {/* Rutas protegidas - Cliente */}
       <Route path="/cliente/mis-pedidos" element={
         <ProtectedRoute allowedRoles={['cliente']}>
           <Cliente />
@@ -34,8 +37,6 @@ const AppRoutes = () => {
           <Cliente />
         </ProtectedRoute>
       } />
-
-      {/* Rutas protegidas - Cliente */}
       <Route path="/cliente" element={
         <ProtectedRoute allowedRoles={['cliente']}>
           <Cliente />

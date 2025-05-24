@@ -3,6 +3,7 @@ import Navbar from './components/Navbar.jsx';
 import Footer from './components/Footer.jsx';
 import AppRoutes from './routes/AppRoutes';
 import './index.css'; 
+import '@fortawesome/fontawesome-free/css/all.min.css';
 
 function App() {
   return (
