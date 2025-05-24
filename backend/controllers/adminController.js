@@ -105,29 +105,43 @@ export const eliminarProducto = async (req, res) => {
     conn.release();
   }
 };
-
-// Listar todos los productos
+// Listar todos los productos con nombre de categoría
 export const listarProductos = async (req, res) => {
   try {
-    const [productos] = await pool.query('SELECT * FROM producto');
-    res.json(productos);
+    // Modificamos la consulta SQL para hacer un JOIN con la tabla de categorías
+    const [productos] = await pool.query(`
+      SELECT 
+        p.id_producto, 
+        p.nombre AS nombre_producto, 
+        p.descripcion, 
+        p.imagen_url, 
+        p.estado, 
+        p.precio, 
+        c.nombre_categoria 
+      FROM 
+        producto p
+      INNER JOIN 
+        categoria c ON p.categoria_id_categoria = c.id_categoria
+    `);
+
+    // Verifica si productos tienen nombre_categoria antes de enviarlo
+    console.log(productos); // Verificar la respuesta de los productos con la categoría
+    res.json(productos); // Devolver los productos con su categoría
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al obtener productos' });
   }
 };
-
-// Obtener todas las marcas
 export const obtenerMarcas = async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM marca');
-    res.json(rows);
+    const [rows] = await pool.query('SELECT * FROM marca'); // Ajusta la consulta si es necesario
+    console.log('Marcas:', rows);  // Verifica que los datos se estén obteniendo correctamente desde la base de datos
+    res.json(rows); // Devuelve las marcas como un JSON
   } catch (err) {
-    console.error(err);
+    console.error('Error al obtener marcas:', err);
     res.status(500).json({ error: 'Error al obtener marcas' });
   }
 };
-
 // Obtener todas las tallas
 export const obtenerTallas = async (req, res) => {
   try {
@@ -149,20 +163,38 @@ export const obtenerCategorias = async (req, res) => {
     res.status(500).json({ error: 'Error al obtener categorías' });
   }
 };
+// Listar productos con detalles y categoría
 export const listarProductosConDetalles = async (req, res) => {
   try {
-    // Consulta SQL que une producto con detalle_producto y marca
+    // Consulta SQL corregida
     const query = `
-      SELECT p.id_producto, p.nombre AS nombre_producto, p.imagen_url, d.precio, m.nombre AS nombre_marca
-      FROM producto p
-      JOIN producto_detalle d ON p.id_producto = d.producto_id
-      JOIN marca m ON d.marca_id = m.id_marca
-      WHERE p.estado = 'activo'
+      SELECT 
+        p.id_producto, 
+        p.nombre AS nombre_producto, 
+        p.descripcion, 
+        p.imagen_url, 
+        p.estado, 
+        pd.precio,    -- Obtener el precio desde la tabla producto_detalle
+        c.nombre_categoria,    -- Obtener el nombre de la categoría desde la tabla categoria
+        pd.id_detalle_producto, 
+        pd.marca_id, 
+        pd.talla_id, 
+        pd.stock
+      FROM 
+        producto p
+      INNER JOIN 
+        categoria c ON p.categoria_id = c.id_categoria  -- Usar 'categoria_id' en lugar de 'categoria_id_categoria'
+      INNER JOIN 
+        producto_detalle pd ON p.id_producto = pd.producto_id  -- Usar 'producto_id' en lugar de 'producto_id_producto'
+      WHERE 
+        p.estado = 'activo';
     `;
 
     const [rows] = await pool.query(query);
 
-    res.json(rows);
+    console.log('Productos con categorías:', rows);  // Verificar que los productos tienen la categoría
+
+    res.json(rows);  // Enviar los productos con detalles y categoría
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Error al obtener productos con detalles' });

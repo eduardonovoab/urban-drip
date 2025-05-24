@@ -1,8 +1,8 @@
 /* index.css */
 body {
-  background: linear-gradient(135deg, #242424 0%, #1a1a1a 100%);
+  background: #ffffff;
   font-family: 'Montserrat', sans-serif;
-  color: rgba(255, 255, 255, 0.87);
+  color: rgba(0, 0, 0, 0.87); /* texto oscuro para fondo claro */
   margin: 0;
   min-height: 100vh;
 }
@@ -24,10 +24,10 @@ button {
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
+  background-color: #f0f0f0; /* claro para botón en fondo blanco */
   cursor: pointer;
   transition: border-color 0.25s;
-  color: white;
+  color: #000; /* texto oscuro en botón claro */
 }
 
 button:hover {
@@ -46,6 +46,7 @@ button:focus-visible {
   /* padding: 2rem; */
   text-align: center;
 }
+
 /* Contenedor principal navbar */
 .navbar-container {
   display: flex;
@@ -72,7 +73,7 @@ button:focus-visible {
 /* Links del menú */
 .navbar-menu a {
   font-weight: 600;
-  color: #000;
+  color: #000; /* texto negro para fondo claro */
   text-decoration: none;
   transition: color 0.3s;
 }
@@ -85,6 +86,6 @@ button:focus-visible {
 .navbar-cart {
   margin-left: 1rem;
   font-size: 1.5rem;
-  color: #000;
+  color: #000; /* negro para fondo claro */
   cursor: pointer;
 }

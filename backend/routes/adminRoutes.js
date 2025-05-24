@@ -9,7 +9,6 @@ import {
   eliminarProducto,
   getProductoById,
   actualizarProducto,
-  obtenerMarcas,
   obtenerTallas,
   obtenerCategorias,
   listarProductos,
@@ -26,8 +25,6 @@ router.get('/producto', authenticateToken, verifyAdmin, listarProductos);
 router.get('/producto/:id', authenticateToken, verifyAdmin, getProductoById);
 router.put('/producto/:id', authenticateToken, verifyAdmin, actualizarProducto);
 router.delete('/producto/:id', authenticateToken, verifyAdmin, eliminarProducto);
-
-router.get('/marcas', authenticateToken, verifyAdmin, obtenerMarcas);
 router.get('/tallas', authenticateToken, verifyAdmin, obtenerTallas);
 
 export default router;

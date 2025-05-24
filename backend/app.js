@@ -19,6 +19,7 @@ app.use(express.json());
 // Rutas públicas y protegidas
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api', publicRoutes); 
 app.use('/api/productos', publicRoutes);       // Aquí tus productos públicos
 app.use('/api/usuario', usuarioRoutes);
 app.use('/api/location', locationRoutes);

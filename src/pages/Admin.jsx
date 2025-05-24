@@ -57,7 +57,7 @@ const Admin = () => {
       toast.error('La descripción es obligatoria');
       return false;
     }
-    if (producto.imagen_url && !/^https?:\/\/.+\.(jpg|jpeg|png|gif)$/i.test(producto.imagen_url)) {
+    if (producto.imagen_url && !/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)$/i.test(producto.imagen_url)) {
       toast.error('La URL de la imagen no es válida');
       return false;
     }

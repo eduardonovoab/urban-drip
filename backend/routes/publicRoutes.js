@@ -1,10 +1,15 @@
-// backend/routes/publicRoutes.js
 import express from 'express';
-import { listarProductos } from '../controllers/adminController.js'; // ajusta la ruta si es necesario
+import 
+{ listarProductos, 
+listarProductosConDetalles, 
+obtenerMarcas }
+ from '../controllers/adminController.js';
 
 const router = express.Router();
 
 // Ruta pública para obtener todos los productos
 router.get('/productos', listarProductos);
+router.get('/productos-detalles', listarProductosConDetalles);
+router.get('/marcas', obtenerMarcas);  // Esta es la ruta pública para las marcas
 
 export default router;
