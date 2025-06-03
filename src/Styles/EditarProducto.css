@@ -1,0 +1,73 @@
+/* Estilos para la página de edición de producto */
+
+.editar-producto-container {
+  max-width: 900px;
+  margin: 20px auto;
+  padding: 20px;
+  background-color: #f9f9f9;
+  border-radius: 10px;
+  box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+h2 {
+  text-align: center;
+  font-size: 2rem;
+  margin-bottom: 20px;
+}
+
+.formulario-editar-producto {
+  display: flex;
+  flex-direction: column;
+}
+
+.input-container {
+  margin-bottom: 15px;
+}
+
+label {
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+input,
+textarea,
+select {
+  width: 100%;
+  padding: 10px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
+
+textarea {
+  resize: vertical;
+}
+
+button {
+  padding: 10px 20px;
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+button:hover {
+  background-color: #45a049;
+}
+
+.detalles-container {
+  border-top: 1px solid #ddd;
+  padding-top: 20px;
+}
+
+.btn-submit {
+  margin-top: 20px;
+  background-color: #008cba;
+  color: white;
+}
+
+button:disabled {
+  background-color: #ddd;
+  cursor: not-allowed;
+}

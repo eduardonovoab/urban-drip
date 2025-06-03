@@ -1,3 +1,4 @@
+// clientRoutes.js
 import express from 'express';
 import { getProductos, getCarrito, agregarAlCarrito, realizarPedido } from '../controllers/clientController.js';
 import { authenticateToken, isClient } from '../middleware/authMiddleware.js';

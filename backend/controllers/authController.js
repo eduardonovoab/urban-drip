@@ -70,7 +70,7 @@ export const registerUser = async (req, res) => {
   }
 };
 
-export const loginUser = async (req, res) => {
+export const login = async (req, res) => {
   const { correo, contrasena } = req.body;
 
   try {
@@ -85,7 +85,7 @@ export const loginUser = async (req, res) => {
     const token = jwt.sign(
       {
         id_usuario: usuario.id_usuario,
-        rol: usuario.rol,
+        rol: usuario.rol,  // Asegúrate de que el rol esté incluido en el token
         correo: usuario.correo,
       },
       process.env.JWT_SECRET,
@@ -96,4 +96,20 @@ export const loginUser = async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+};
+export const verifyToken = (req, res) => {
+  const token = req.headers['authorization'];
+
+  if (!token) {
+    return res.status(403).json({ message: 'Token no proporcionado' });
+  }
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(401).json({ message: 'Token inválido' });
+    }
+
+    req.user = decoded; // Asignar el payload decodificado al objeto `user` en la solicitud
+    return res.status(200).json({ message: 'Token válido' });
+  });
 };

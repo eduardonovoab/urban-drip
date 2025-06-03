@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Swiper, SwiperSlide } from 'swiper/react';
+import { useNavigate } from 'react-router-dom';
 import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/pagination';
@@ -7,13 +8,14 @@ import { Navigation, Pagination } from 'swiper/modules';
 
 const ProductosDestacados = () => {
   const [productos, setProductos] = useState([]);
+  const navigate = useNavigate(); // Usaremos navigate para redirigir al detalle del producto
 
   useEffect(() => {
-    // Cargar los productos desde la API
-    fetch('http://localhost:3000/api/admin/productos-detalles') // Asegúrate de que esta URL sea la correcta
+    // Cargar los productos desde la API (sin token porque es pública)
+    fetch('http://localhost:3000/api/admin/productos-detalles')
       .then(res => res.json())
       .then(data => {
-        console.log('Productos recibidos:', data); // Verifica la respuesta de la API
+        console.log('Productos recibidos:', data);
         setProductos(data);
       })
       .catch(err => console.error('Error al cargar productos:', err));
@@ -24,9 +26,7 @@ const ProductosDestacados = () => {
     const grupos = {}; // Objeto para agrupar productos por categoría
 
     productos.forEach(prod => {
-      // Usar 'nombre_categoria' ahora que ya lo tenemos desde la API
-      const categoria = prod.nombre_categoria || 'Sin categoría'; 
-      console.log(`Producto: ${prod.nombre_producto}, Categoría: ${categoria}`); // Verificar qué categoría asignamos
+      const categoria = prod.nombre_categoria || 'Sin categoría'; // Ajuste para nombre de categoría
 
       if (!grupos[categoria]) {
         grupos[categoria] = [];
@@ -36,11 +36,15 @@ const ProductosDestacados = () => {
       }
     });
 
-    console.log(grupos); // Verifica cómo quedan agrupados los productos por categoría
     return Object.values(grupos).flat(); // Aplana los grupos en un solo arreglo
   };
 
   const productosFiltrados = filtrarPorCategoria(productos);
+
+  // Función para redirigir al detalle del producto
+  const handleDetalleProducto = (idProducto) => {
+    navigate(`/producto/${idProducto}`); // Redirige a la ruta de detalle del producto
+  };
 
   return (
     <section className="max-w-7xl mx-auto px-4 py-8">
@@ -54,13 +58,13 @@ const ProductosDestacados = () => {
         slidesPerView={1}
         breakpoints={{
           600: {
-            slidesPerView: 2, // Muestra 2 productos por fila en pantallas medianas
+            slidesPerView: 2,
           },
           900: {
-            slidesPerView: 4, // Muestra 4 productos por fila en pantallas grandes
+            slidesPerView: 4,
           },
         }}
-        style={{ paddingBottom: '60px' }} // Espacio para flechas y paginación
+        style={{ paddingBottom: '60px' }}
       >
         {productosFiltrados.map((prod, i) => (
           <SwiperSlide key={i}>
@@ -74,15 +78,9 @@ const ProductosDestacados = () => {
                 maxWidth: '280px',
                 margin: '0 auto',
                 transition: 'box-shadow 0.3s ease',
+                cursor: 'pointer' // Hace que el div sea clickeable
               }}
-              onMouseEnter={e => {
-                e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.15)';
-                e.currentTarget.querySelector('.producto-img').style.transform = 'scale(1.05)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.1)';
-                e.currentTarget.querySelector('.producto-img').style.transform = 'scale(1)';
-              }}
+              onClick={() => handleDetalleProducto(prod.id_detalle_producto)} // Redirige al detalle
             >
               <img
                 src={prod.imagen_url}

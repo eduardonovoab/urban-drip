@@ -1,0 +1,120 @@
+/* Detalle de Producto */
+.detalle-producto-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  font-family: 'Roboto', sans-serif;
+  color: #333;
+}
+
+.back-link {
+  display: inline-block;
+  font-size: 1rem;
+  color: #4c89ff;
+  margin-bottom: 20px;
+  transition: color 0.3s;
+}
+
+.back-link:hover {
+  color: #2a6ebb;
+}
+
+.producto-title {
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: #111;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.producto-image-container {
+  max-width: 500px; /* Imagen más pequeña */
+  margin: 0 auto;
+}
+
+.producto-img {
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease;
+}
+
+.producto-img:hover {
+  transform: scale(1.05);
+}
+
+.producto-precio {
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: #f97316;
+  text-align: center;
+  margin-top: 10px;
+}
+
+.talla-selector-container {
+  position: relative;
+  text-align: center;
+  margin-top: 30px;
+}
+
+.talla-button {
+  padding: 12px 24px;
+  background-color: #f97316;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.talla-button:hover {
+  background-color: #e76209;
+}
+
+.talla-list {
+  position: absolute;
+  top: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #fff;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: 5px;
+}
+
+.talla-item {
+  padding: 10px 15px;
+  cursor: pointer;
+  text-align: center;
+  transition: background-color 0.3s ease;
+}
+
+.talla-item:hover {
+  background-color: #f1f1f1;
+}
+
+.talla-item.active {
+  background-color: #f97316;
+  color: white;
+  font-weight: bold;
+}
+
+.stock-info {
+  text-align: center;
+  margin-top: 15px;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.producto-description {
+  font-size: 1.1rem;
+  margin-top: 25px;
+  line-height: 1.6;
+  text-align: center;
+}

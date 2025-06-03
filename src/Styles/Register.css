@@ -1,0 +1,55 @@
+/* Estilos para el formulario de registro */
+.form-register {
+  width: 100%;
+  max-width: 500px;
+  margin: 0 auto;
+  padding: 30px;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.form-title {
+  font-size: 2rem;
+  font-weight: bold;
+  text-align: center;
+  color: #333;
+  margin-bottom: 20px;
+}
+
+.input-field {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 16px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 1rem;
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+}
+
+.input-field:focus {
+  border-color: #f97316;
+  outline: none;
+}
+
+.submit-button {
+  width: 100%;
+  padding: 12px;
+  background-color: #f97316;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.submit-button:hover {
+  background-color: #e76209;
+}
+
+/* Enlace de redirección */
+.submit-button:active {
+  background-color: #e75a09;
+}

@@ -1,56 +1,26 @@
-import React from 'react';
-
-const categorias = [
-  {
-    id: 1,
-    nombre: 'Poleras',
-    url: '/collection/poleras',
-    imagenes: {
-      desktop: 'https://dojiw2m9tvv09.cloudfront.net/77327/1/dsc088169991.jpg?24&time=1747953932',
-      mobile: 'https://dojiw2m9tvv09.cloudfront.net/77327/1/T_dsc088169991.jpg?24&time=1747953932',
-    },
-  },
-  {
-    id: 3,
-    nombre: 'Polerones',
-    url: '/collection/polerones',
-    imagenes: {
-      desktop: 'https://dojiw2m9tvv09.cloudfront.net/77327/1/dsc067993420.jpg?24&time=1747953932',
-      mobile: 'https://dojiw2m9tvv09.cloudfront.net/77327/1/T_dsc067993420.jpg?24&time=1747953932',
-    },
-  },
-  {
-    id: 4,
-    nombre: 'Pantalones',
-    url: '/collection/calzado',
-    imagenes: {
-      desktop: 'https://catcl.vtexassets.com/arquivos/ids/526939/4070031_2JU_1.jpg?v=638442098146330000?width=1200&height=auto',
-      mobile: 'https://dojiw2m9tvv09.cloudfront.net/77327/1/T_img-69030242.jpg?24&time=1747953932',
-    },
-  },
-  {
-    id: 5,
-    nombre: 'Shorts',
-    url: '/collection/vinilos-resuena?srsltid=AfmBOopn5Cu79qIv2YoZ-lVBxK5iPiBxNBhoMU-f_nTh-qknk_aWXZLt',
-    imagenes: {
-      desktop: 'https://nikeclprod.vtexassets.com/arquivos/ids/724300-800-800?v=638241059659430000&width=800&height=800&aspect=true',
-      mobile: 'https://dojiw2m9tvv09.cloudfront.net/77327/1/T_sinti-tulo-166645.png?24&time=1747953932',
-    },
-  },
-  {
-    id: 7,
-    nombre: 'Casacas',
-    url: '/collection/chaquetas',
-    imagenes: {
-      desktop: 'https://dojiw2m9tvv09.cloudfront.net/77327/1/copiadedsc071799865.jpg?24&time=1747953932',
-      mobile: 'https://dojiw2m9tvv09.cloudfront.net/77327/1/T_copiadedsc071799865.jpg?24&time=1747953932',
-    },
-  },
-];
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';  // Importa Link
 
 const Categorias = () => {
+  const [categorias, setCategorias] = useState([]);
+
+  useEffect(() => {
+    fetch('http://localhost:3000/api/categorias')
+      .then(res => res.json())
+      .then(data => setCategorias(data))
+      .catch(err => console.error('Error al cargar categorías:', err));
+  }, []);
+
+  const categoriaImagenes = {
+    'Poleras': 'https://dojiw2m9tvv09.cloudfront.net/77327/1/dsc088169991.jpg?24&time=1747953932',
+    'Polerones': 'https://dojiw2m9tvv09.cloudfront.net/77327/1/dsc067993420.jpg?24&time=1747953932',
+    'Pantalones': 'https://catcl.vtexassets.com/arquivos/ids/526939/4070031_2JU_1.jpg?v=638442098146330000?width=1200&height=auto',
+    'Shorts': 'https://nikeclprod.vtexassets.com/arquivos/ids/724300-800-800?v=638241059659430000&width=800&height=800&aspect=true',
+    'Casacas': 'https://dojiw2m9tvv09.cloudfront.net/77327/1/copiadedsc071799865.jpg?24&time=1747953932',
+  };
+
   return (
-    <>
+    <section>
       <style>{`
         .grid-categorias {
           display: grid;
@@ -90,30 +60,34 @@ const Categorias = () => {
           }
         }
       `}</style>
-      <section>
-        <h2 style={{ textAlign: 'center', marginBottom: '30px', color: '#000', fontSize: '2rem' }}>
-          Categorías
-        </h2>
-        <div className="grid-categorias">
-          {categorias.map(({ id, nombre, url, imagenes }) => (
-            <a
-              key={id}
-              href={url}
-              className="categoria-item"
-              title={nombre}
-              style={{ textDecoration: 'none' }}
-            >
-              <img
-                src={imagenes.desktop}
-                alt={nombre}
-                loading="lazy"
-              />
-              <div className="categoria-titulo">{nombre}</div>
-            </a>
-          ))}
-        </div>
-      </section>
-    </>
+
+      <h2 style={{ textAlign: 'center', marginBottom: '30px', color: '#000', fontSize: '2rem' }}>
+        Categorías
+      </h2>
+
+      <div className="grid-categorias">
+        {categorias.length === 0 ? (
+          <p style={{ textAlign: 'center' }}>Cargando categorías...</p>
+        ) : (
+          categorias.map(({ id_categoria, nombre_categoria }) => {
+            const imgUrl = categoriaImagenes[nombre_categoria] || 'https://via.placeholder.com/300x180?text=Sin+imagen';
+
+            return (
+              <Link
+                key={id_categoria}
+                to={`/productos/categoria/${id_categoria}`}  // Navega a la ruta que muestra los productos de esa categoría
+                className="categoria-item"
+                title={nombre_categoria}
+                style={{ textDecoration: 'none' }}
+              >
+                <img src={imgUrl} alt={nombre_categoria} loading="lazy" />
+                <div className="categoria-titulo">{nombre_categoria}</div>
+              </Link>
+            );
+          })
+        )}
+      </div>
+    </section>
   );
 };
 

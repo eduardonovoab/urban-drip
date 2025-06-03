@@ -1,0 +1,88 @@
+/* Estilos generales para el login */
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f4f7fc;
+  margin: 0;
+  padding: 0;
+}
+
+/* Contenedor principal del login */
+.login-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background: #f4f7fc;
+}
+
+/* Formulario de login */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  background-color: white;
+  padding: 30px;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 400px;
+}
+
+/* Estilos de los inputs */
+.login-input {
+  padding: 10px;
+  font-size: 16px;
+  border-radius: 5px;
+  border: 1px solid #ddd;
+  outline: none;
+  transition: all 0.3s;
+}
+
+.login-input:focus {
+  border-color: #007bff;
+}
+
+/* Estilo del botón de login */
+.login-button {
+  padding: 12px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.login-button:hover {
+  background-color: #0056b3;
+}
+
+/* Mensaje de error */
+.login-error {
+  color: red;
+  font-size: 14px;
+  margin-top: 10px;
+}
+
+/* Enlace de registro */
+.register-link {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.register-button {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.3s;
+}
+
+.register-button:hover {
+  background-color: #218838;
+}

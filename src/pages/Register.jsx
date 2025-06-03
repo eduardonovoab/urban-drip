@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import '../Styles/Register.css';  // Importar el archivo CSS de estilos
 
 function validarRut(rutCompleto) {
   rutCompleto = rutCompleto.replace(/\./g, '').replace('-', '');
@@ -62,10 +63,9 @@ const Register = () => {
   }, [form.region_id]);
 
   const validateEmail = (email) => {
-  const regex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
-  return regex.test(email);
-};
-
+    const regex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
+    return regex.test(email);
+  };
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -116,8 +116,8 @@ const Register = () => {
 
   return (
     <>
-      <form onSubmit={handleSubmit} className="max-w-md mx-auto p-4">
-        <h2 className="text-2xl mb-4">Registro de Usuario</h2>
+      <form onSubmit={handleSubmit} className="form-register">
+        <h2 className="form-title">Registro de Usuario</h2>
 
         <input
           name="nombre"
@@ -125,7 +125,7 @@ const Register = () => {
           value={form.nombre}
           onChange={handleChange}
           required
-          className="block w-full p-2 mb-2 border"
+          className="input-field"
         />
         <input
           name="apellido"
@@ -133,7 +133,7 @@ const Register = () => {
           value={form.apellido}
           onChange={handleChange}
           required
-          className="block w-full p-2 mb-2 border"
+          className="input-field"
         />
         <input
           name="correo"
@@ -142,7 +142,7 @@ const Register = () => {
           value={form.correo}
           onChange={handleChange}
           required
-          className="block w-full p-2 mb-2 border"
+          className="input-field"
         />
         <input
           name="contrasena"
@@ -151,7 +151,7 @@ const Register = () => {
           value={form.contrasena}
           onChange={handleChange}
           required
-          className="block w-full p-2 mb-2 border"
+          className="input-field"
         />
         <input
           name="rut"
@@ -159,7 +159,7 @@ const Register = () => {
           value={form.rut}
           onChange={handleChange}
           required
-          className="block w-full p-2 mb-2 border"
+          className="input-field"
         />
         <input
           name="direccion"
@@ -167,7 +167,7 @@ const Register = () => {
           value={form.direccion}
           onChange={handleChange}
           required
-          className="block w-full p-2 mb-2 border"
+          className="input-field"
         />
         <input
           name="ciudad"
@@ -175,7 +175,7 @@ const Register = () => {
           value={form.ciudad}
           onChange={handleChange}
           required
-          className="block w-full p-2 mb-2 border"
+          className="input-field"
         />
 
         <select
@@ -183,7 +183,7 @@ const Register = () => {
           value={form.region_id}
           onChange={handleChange}
           required
-          className="block w-full p-2 mb-2 border"
+          className="input-field"
         >
           <option value="">Selecciona Región</option>
           {regiones.map((r) => (
@@ -199,7 +199,7 @@ const Register = () => {
           onChange={handleChange}
           disabled={!form.region_id}
           required
-          className="block w-full p-2 mb-4 border"
+          className="input-field"
         >
           <option value="">Selecciona Comuna</option>
           {comunas.map((c) => (
@@ -209,7 +209,7 @@ const Register = () => {
           ))}
         </select>
 
-        <button type="submit" className="w-full bg-blue-600 text-white p-2 rounded">
+        <button type="submit" className="submit-button">
           Registrarse
         </button>
       </form>

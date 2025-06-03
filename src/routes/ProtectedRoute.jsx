@@ -1,22 +1,17 @@
 import React, { useContext } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
+import { Navigate } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext'; // El contexto de autenticación
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { token, user } = useContext(AuthContext);
-  const location = useLocation();
+  const { user } = useContext(AuthContext); // Obtener el usuario del contexto de autenticación
 
-  if (!token) {
-    // No autenticado → redirigir a login
-    return <Navigate to="/login" state={{ from: location }} replace />;
+  // Si el usuario no está logueado o su rol no está en los roles permitidos
+  if (!user || !allowedRoles.includes(user.rol)) {
+    // Redirigir al login si no está autenticado o no tiene el rol adecuado
+    return <Navigate to="/login" />;
   }
 
-  if (allowedRoles && (!user || !allowedRoles.includes(user.rol))) {
-    // Usuario sin permiso → redirigir a home o página de error
-    return <Navigate to="/" replace />;
-  }
-
-  return children;
+  return children; // Si pasa la validación, renderiza la ruta protegida
 };
 
 export default ProtectedRoute;

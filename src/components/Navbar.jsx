@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react'; // Asegúrate de importar useEffect aquí
 import { Link } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext'; // Importamos el contexto
 
 const Navbar = () => {
+  const { user, logout } = useContext(AuthContext); // Obtener el usuario desde el contexto
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [categorias, setCategorias] = useState([]);
   const dropdownRef = useRef(null);
@@ -11,7 +13,7 @@ const Navbar = () => {
       .then(res => res.json())
       .then(data => setCategorias(data))
       .catch(err => console.error('Error al cargar categorías:', err));
-  }, []);
+  }, []); // useEffect para cargar las categorías al montar el componente
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -22,7 +24,7 @@ const Navbar = () => {
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, []); // Cerrar dropdown cuando se haga clic fuera de él
 
   return (
     <header className="border-t border-gray-300 bg-white shadow-sm fixed w-full top-0 left-0 z-50">
@@ -40,7 +42,6 @@ const Navbar = () => {
         <nav className="navbar-menu hidden md:flex gap-8 items-center">
           <Link to="/" className="nav-link">Inicio</Link>
 
-          {/* Contenedor relativo para posicionar dropdown */}
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setDropdownOpen(!dropdownOpen)}
@@ -56,7 +57,6 @@ const Navbar = () => {
                 stroke="currentColor"
                 viewBox="0 0 24 24"
                 xmlns="http://www.w3.org/2000/svg"
-                aria-hidden="true"
                 className={`dropdown-arrow ${dropdownOpen ? 'open' : ''}`}
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
@@ -87,7 +87,16 @@ const Navbar = () => {
           </div>
 
           <Link to="/contacto" className="nav-link">Contacto</Link>
-          <Link to="/login" className="nav-link">Ingresar</Link>
+
+          {/* Cambiar el enlace dependiendo del estado de login */}
+          {user ? (
+            <>
+              <span>Bienvenido, {user.nombre}</span>
+              <button onClick={logout} className="nav-link">Cerrar sesión</button>
+            </>
+          ) : (
+            <Link to="/login" className="nav-link">Ingresar</Link>
+          )}
 
           <Link to="/perfil" className="text-black hover:text-orange-500 transition text-2xl ml-4" title="Perfil">
             <i className="fas fa-user-circle"></i>

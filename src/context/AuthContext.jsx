@@ -1,34 +1,35 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect } from 'react';
 
-export const AuthContext = createContext();
+const AuthContext = createContext();
 
-export const AuthProvider = ({ children }) => {
-  const [token, setToken] = useState(localStorage.getItem('token') || null);
-  const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')) || null);
+const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
+    const token = localStorage.getItem('token');
     if (token) {
-      localStorage.setItem('token', token);
-    } else {
-      localStorage.removeItem('token');
-      setUser(null);
+      const storedUser = JSON.parse(localStorage.getItem('usuario'));
+      setUser(storedUser); // Cargar datos del usuario
     }
-  }, [token]);
+  }, []);
 
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem('user', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('user');
-    }
-  }, [user]);
+  const login = (userData, token) => {
+    setUser(userData);
+    localStorage.setItem('token', token); // Guardar el token real
+    localStorage.setItem('usuario', JSON.stringify(userData));
+  };
+
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem('token');
+    localStorage.removeItem('usuario');
+  };
 
   return (
-    <AuthContext.Provider value={{ token, setToken, user, setUser }}>
+    <AuthContext.Provider value={{ user, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-// Hook personalizado para consumir el contexto fácilmente
-export const useAuth = () => useContext(AuthContext);
+export { AuthProvider, AuthContext };

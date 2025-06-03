@@ -1,33 +1,37 @@
+// authMiddleware.js
 import jwt from 'jsonwebtoken';
 
-const SECRET_KEY = process.env.JWT_SECRET;
-
-// Verifica que el token JWT es válido
+// Middleware para autenticar el token
 export const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  const token = req.headers['authorization']?.split(' ')[1]; // "Bearer token"
+  console.log("Token recibido:", token);
 
-  if (!token) return res.status(401).json({ error: 'Token requerido' });
+  if (!token) {
+    return res.status(401).json({ message: 'Token no proporcionado' });  // Si no hay token, error 401
+  }
 
-  jwt.verify(token, SECRET_KEY, (err, user) => {
-    if (err) return res.status(403).json({ error: 'Token inválido' });
-    req.user = user; // payload del JWT (usualmente contiene id, rol, etc)
-    next();
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(403).json({ message: 'Token inválido' });  // Si el token no es válido, error 403
+    }
+    console.log("Usuario decodificado:", decoded);
+    req.user = decoded; // Decodificamos el token y asignamos los datos del usuario a `req.user`
+    next(); // Continuamos con el siguiente middleware
   });
 };
 
-// Verifica que el usuario tenga rol "admin"
+// Middleware para verificar si el usuario tiene rol de administrador
 export const verifyAdmin = (req, res, next) => {
-  if (req.user && req.user.rol === 'admin') {
-    return next();
+  if (req.user?.rol !== 'admin') {  // Verificamos que el rol sea 'admin'
+    return res.status(403).json({ message: 'Acceso denegado. No eres un administrador' });
   }
-  return res.status(403).json({ message: 'Acceso denegado: Solo administradores' });
+  next(); // Si es administrador, continuamos con la siguiente función
 };
 
-// Verifica que el usuario tenga rol "cliente"
+// Middleware para verificar si el usuario tiene rol de cliente
 export const isClient = (req, res, next) => {
-  if (req.user && req.user.rol === 'cliente') {
-    return next();
+  if (req.user?.rol !== 'cliente') {
+    return res.status(403).json({ error: 'Acceso denegado, solo para clientes' });
   }
-  return res.status(403).json({ message: 'Acceso denegado: Solo clientes' });
+  next(); // Si es cliente, pasamos al siguiente middleware
 };

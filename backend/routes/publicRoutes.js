@@ -5,7 +5,10 @@ listarProductosConDetalles,
 obtenerMarcas,
 listarProductosPorCategoria,
 obtenerCategoriaPorId,
-obtenerCategorias}
+obtenerCategorias,
+getProductosPorMarca,
+obtenerMarcaPorId ,
+getProductoDetallePorId }
  from '../controllers/adminController.js';
 
 const router = express.Router();
@@ -17,4 +20,7 @@ router.get('/marcas', obtenerMarcas);  // Esta es la ruta pública para las marc
 router.get('/productos/categoria/:id', listarProductosPorCategoria);
 router.get('/categorias/:id', obtenerCategoriaPorId);
 router.get('/categorias', obtenerCategorias);
+router.get('/productos/marca/:id', getProductosPorMarca);
+router.get('/marcas/:id', obtenerMarcaPorId);
+router.get('/producto-detalle/:id', getProductoDetallePorId);
 export default router;

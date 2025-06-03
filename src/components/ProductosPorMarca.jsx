@@ -1,34 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 
-const ProductosPorCategoria = () => {
+const ProductosPorMarca = () => {
   const { id } = useParams();
   const [productos, setProductos] = useState([]);
-  const [nombreCategoria, setNombreCategoria] = useState('');
+  const [marcaNombre, setMarcaNombre] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`http://localhost:3000/api/productos/categoria/${id}`)
+    fetch(`http://localhost:3000/api/productos/marca/${id}`)
       .then(res => res.json())
       .then(data => {
-        setProductos(data);
+        setProductos(data.productos || []);
+        setMarcaNombre(data.marcaNombre || '');
         setLoading(false);
       })
       .catch(err => {
-        console.error('Error al cargar productos por categoría:', err);
+        console.error('Error al cargar productos por marca:', err);
         setLoading(false);
       });
-
-    fetch(`http://localhost:3000/api/categorias/${id}`)
-      .then(res => res.json())
-      .then(data => {
-        setNombreCategoria(data.nombre_categoria || 'Categoría');
-      })
-      .catch(() => setNombreCategoria('Categoría'));
   }, [id]);
 
   if (loading) return <p className="text-center mt-10">Cargando productos...</p>;
-  if (productos.length === 0) return <p className="text-center mt-10">No hay productos en esta categoría.</p>;
+  if (productos.length === 0) return <p className="text-center mt-10">No hay productos para esta marca.</p>;
 
   return (
     <>
@@ -97,22 +91,22 @@ const ProductosPorCategoria = () => {
 
       <section>
         <h2 style={{ textAlign: 'center', marginBottom: '30px', color: '#000', fontSize: '2rem' }}>
-          {nombreCategoria}
+          {marcaNombre}
         </h2>
         <div className="grid-productos">
-          {productos.map((prod, index) => (
+          {productos.map((prod) => (
             <Link
-              key={prod.id_detalle_producto ?? index}
+              key={prod.id_detalle_producto}
               to={`/producto/${prod.id_detalle_producto}`} // Ruta al detalle del producto
               className="producto-item"
-              title={prod.nombre_producto}
+              title={prod.nombre}
             >
               <img
                 src={prod.imagen_url}
-                alt={prod.nombre_producto}
+                alt={prod.nombre}
                 loading="lazy"
               />
-              <div className="producto-titulo">{prod.nombre_producto}</div>
+              <div className="producto-titulo">{prod.nombre}</div>
               <div className="producto-precio">${Number(prod.precio).toLocaleString('es-CL')}</div>
             </Link>
           ))}
@@ -122,4 +116,4 @@ const ProductosPorCategoria = () => {
   );
 };
 
-export default ProductosPorCategoria;
+export default ProductosPorMarca;
