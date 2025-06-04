@@ -2,10 +2,16 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { ToastContainer, toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
-import '../styles/ListarProductos.css';
+import { Search, Filter, Edit, Power, Eye, Package, TrendingUp, AlertCircle, Tag, ShoppingBag, Grid, List } from 'lucide-react';
+import '../Styles/ListarProductos.css'; // Importando los estilos
 
 const ListarProductos = () => {
   const [productos, setProductos] = useState([]);
+  const [filtroCategoria, setFiltroCategoria] = useState('');
+  const [filtroEstado, setFiltroEstado] = useState('');
+  const [busqueda, setBusqueda] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [vistaGrid, setVistaGrid] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -13,6 +19,7 @@ const ListarProductos = () => {
     if (token) {
       const fetchData = async () => {
         try {
+          setLoading(true);
           const response = await axios.get('http://localhost:3000/api/admin/producto', {
             headers: { Authorization: `Bearer ${token}` }
           });
@@ -20,9 +27,14 @@ const ListarProductos = () => {
         } catch (error) {
           console.error('Error al cargar productos:', error);
           toast.error('Error al cargar productos');
+        } finally {
+          setLoading(false);
         }
       };
       fetchData();
+    } else {
+      setLoading(false);
+      toast.error('No estás autenticado');
     }
   }, []);
 
@@ -57,38 +69,117 @@ const ListarProductos = () => {
     }
   };
 
+  const handleVerDetalles = (id) => {
+    navigate(`/admin/detalle/${id}`);
+  };
+
+  // Filtrar productos
+  const productosFiltrados = productos.filter(producto => {
+    const coincideBusqueda = producto.nombre_producto.toLowerCase().includes(busqueda.toLowerCase()) ||
+                            producto.nombre_marca.toLowerCase().includes(busqueda.toLowerCase());
+    const coinciadeCategoria = filtroCategoria === '' || producto.nombre_categoria === filtroCategoria;
+    const coinciadeEstado = filtroEstado === '' || producto.estado === filtroEstado;
+    
+    return coincideBusqueda && coinciadeCategoria && coinciadeEstado;
+  });
+
+  const categorias = [...new Set(productos.map(p => p.nombre_categoria))];
+  const totalProductos = productos.length;
+  const productosActivos = productos.filter(p => p.estado === 'activo').length;
+  const stockBajo = productos.filter(p => p.stock < 10).length;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="relative">
+            <div className="animate-spin rounded-full h-20 w-20 border-4 border-indigo-200 border-t-indigo-600 mx-auto"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Package className="w-8 h-8 text-indigo-600" />
+            </div>
+          </div>
+          <p className="text-slate-600 mt-6 font-semibold text-lg">Cargando productos...</p>
+          <p className="text-slate-400 text-sm">Preparando tu inventario</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="producto-list">
-      <h2 className="titulo">Lista de Productos</h2>
-      <div className="productos-container">
-        {productos.map((producto) => (
-          <div className="producto-item" key={producto.id_producto}>
-            <img src={producto.imagen_url} alt={producto.nombre_producto} className="producto-img" />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50">
+      {/* Header */}
+      <div className="header">
+        <div className="header-content">
+          <h1 className="title">Panel de Administración</h1>
+          <div className="vista-toggle">
+            <button
+              onClick={() => setVistaGrid(true)}
+              className={vistaGrid ? 'active' : ''}
+            >
+              <Grid className="icon" />
+            </button>
+            <button
+              onClick={() => setVistaGrid(false)}
+              className={!vistaGrid ? 'active' : ''}
+            >
+              <List className="icon" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="filters">
+        <input
+          type="text"
+          placeholder="Buscar productos..."
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+        />
+        <select
+          value={filtroCategoria}
+          onChange={(e) => setFiltroCategoria(e.target.value)}
+        >
+          <option value="">Todas las categorías</option>
+          {categorias.map(categoria => (
+            <option key={categoria} value={categoria}>{categoria}</option>
+          ))}
+        </select>
+        <select
+          value={filtroEstado}
+          onChange={(e) => setFiltroEstado(e.target.value)}
+        >
+          <option value="">Todos los estados</option>
+          <option value="activo">Activo</option>
+          <option value="inactivo">Inactivo</option>
+        </select>
+      </div>
+
+      {/* Grid de productos */}
+      <div className={`grid-container ${vistaGrid ? 'grid' : 'list'}`}>
+        {productosFiltrados.map((producto) => (
+          <div key={producto.id_producto} className="producto">
+            <div className="producto-imagen">
+              <img 
+                src={producto.imagen_url || 'https://via.placeholder.com/400x400'}
+                alt={producto.nombre_producto}
+              />
+            </div>
             <div className="producto-info">
-              <div className="producto-nombre">{producto.nombre_producto}</div>
-              <div className="producto-precio">${producto.precio}</div>
-              <div className="producto-categoria">Categoría: {producto.nombre_categoria}</div>
-              <div className="producto-talla">Talla: {producto.nombre_talla}</div>
-              <div className="producto-marca">Marca: {producto.nombre_marca}</div>
-              <div className="producto-estado">Estado: {producto.estado}</div>
-              <div className="producto-actions">
-                <button className="btn-modificar" onClick={() => handleModificar(producto.id_producto)}>Modificar</button>
-                <button
-                  className="btn-desactivar"
-                  onClick={() =>
-                    handleCambiarEstado(
-                      producto.id_producto,
-                      producto.estado === 'activo' ? 'inactivo' : 'activo'
-                    )
-                  }
-                >
-                  {producto.estado === 'activo' ? 'Desactivar' : 'Activar'}
-                </button>
-              </div>
+              <h3>{producto.nombre_producto}</h3>
+              <p className="precio">${producto.precio}</p>
+              <button onClick={() => handleVerDetalles(producto.id_producto)}>Ver Detalles</button>
+              <button onClick={() => handleModificar(producto.id_producto)}>Modificar</button>
+              <button onClick={() => handleCambiarEstado(
+                producto.id_producto,
+                producto.estado === 'activo' ? 'inactivo' : 'activo'
+              )}>
+                {producto.estado === 'activo' ? 'Desactivar' : 'Activar'}
+              </button>
             </div>
           </div>
         ))}
       </div>
+
       <ToastContainer position="top-center" autoClose={3000} />
     </div>
   );

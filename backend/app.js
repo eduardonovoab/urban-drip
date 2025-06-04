@@ -9,7 +9,7 @@ import adminRoutes from './routes/adminRoutes.js';
 import publicRoutes from './routes/publicRoutes.js';
 import usuarioRoutes from './routes/usuarioRoutes.js';
 import locationRoutes from './routes/locationRoutes.js';
-import clienteRoutes from './routes/clientRoutes.js';
+import clientRoutes from './routes/clientRoutes.js'; 
 import productoRoutes from './routes/producto.js';
 
 dotenv.config();
@@ -34,6 +34,6 @@ app.use('/api/productos', publicRoutes);
 app.use('/api', productoRoutes); 
 app.use('/api/usuario', usuarioRoutes);
 app.use('/api/location', locationRoutes);
-app.use('/api/cliente', clienteRoutes);
+app.use('/api/cliente', clientRoutes);  // Rutas cliente
 
 export default app;

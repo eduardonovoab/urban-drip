@@ -1,0 +1,70 @@
+/* src/styles/Carrito.css */
+.carrito-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  font-family: 'Roboto', sans-serif;
+  color: #333;
+}
+
+h2 {
+  font-size: 2.5rem;
+  font-weight: bold;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.carrito-productos {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.producto-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #f9f9f9;
+}
+
+.producto-item img {
+  width: 100px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.producto-info {
+  flex-grow: 1;
+  padding-left: 20px;
+}
+
+.producto-info p {
+  margin: 5px 0;
+}
+
+button {
+  background-color: #f97316;
+  color: white;
+  padding: 10px 15px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #e76209;
+}
+
+.carrito-total {
+  margin-top: 30px;
+  text-align: center;
+  font-size: 1.5rem;
+}
+
+.carrito-total button {
+  margin-top: 20px;
+}
