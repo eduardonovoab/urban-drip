@@ -97,3 +97,50 @@ button {
 button:hover {
   background-color: #3b4290;
 }
+.tallas-container {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 6px;
+}
+
+.lista-tallas {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.lista-tallas li {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #eee;
+}
+
+.lista-tallas li:last-child {
+  border-bottom: none;
+}
+
+.btn-ver-tallas {
+  background: none;
+  border: none;
+  color: #007bff;
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.9rem;
+  margin: 0.5rem 0;
+}
+
+.btn-ver-tallas:hover {
+  text-decoration: underline;
+}
+
+.estado span.activo {
+  color: #28a745;
+  font-weight: bold;
+}
+
+.estado span.inactivo {
+  color: #dc3545;
+  font-weight: bold;
+}

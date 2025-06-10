@@ -13,18 +13,56 @@ export const getAdminDashboard = (req, res) => {
 // Obtener producto por ID con detalles
 export const getProductoById = async (req, res) => {
   const { id } = req.params;
-  try {
-    const [producto] = await pool.query('SELECT * FROM producto WHERE id_producto = ?', [id]);
-    if (producto.length === 0) return res.status(404).json({ error: 'Producto no encontrado' });
 
-    const [detalles] = await pool.query('SELECT * FROM producto_detalle WHERE producto_id = ?', [id]);
-    res.json({ producto: producto[0], detalles });
+  try {
+    // Obtener datos básicos del producto
+    const [productoRows] = await pool.query('SELECT * FROM producto WHERE id_producto = ?', [id]);
+    if (productoRows.length === 0) {
+      return res.status(404).json({ error: 'Producto no encontrado' });
+    }
+
+    // Obtener detalles del producto con información completa
+    const [detallesRows] = await pool.query(`
+      SELECT 
+        pd.id_detalle_producto,
+        pd.marca_id,
+        pd.talla_id,
+        pd.precio,
+        pd.stock,
+        m.nombre as marca_nombre,
+        t.talla as talla_nombre
+      FROM producto_detalle pd
+      LEFT JOIN marca m ON pd.marca_id = m.id_marca
+      LEFT JOIN talla t ON pd.talla_id = t.id_talla
+      WHERE pd.producto_id = ?
+      ORDER BY t.talla
+    `, [id]);
+
+    console.log('🔍 Producto obtenido:', productoRows[0]);
+    console.log('🔍 Detalles obtenidos:', detallesRows);
+
+    // Estructurar respuesta
+    const producto = {
+      ...productoRows[0],
+      detalles: detallesRows.map(detalle => ({
+        id: detalle.id,
+        id_detalle: detalle.id, // Para compatibilidad
+        marca_id: detalle.marca_id,
+        talla_id: detalle.talla_id,
+        precio: detalle.precio,
+        stock: detalle.stock,
+        marca_nombre: detalle.marca_nombre,
+        talla_nombre: detalle.talla_nombre
+      }))
+    };
+
+    res.json(producto);
+
   } catch (error) {
-    console.error(error);
+    console.error('❌ Error al obtener producto:', error);
     res.status(500).json({ error: 'Error al obtener producto' });
   }
 };
-
 // Crear un producto nuevo
 export const addProduct = async (req, res) => {
   const { nombre, descripcion, imagen_url, estado, categoria_id, detalles } = req.body;
@@ -94,25 +132,29 @@ export const listarProductos = async (req, res) => {
 
     const [productos] = await pool.query(`
       SELECT 
-    p.id_producto, 
-    p.nombre AS nombre_producto, 
-    p.descripcion, 
-    p.imagen_url, 
-    p.estado, 
-    pd.precio,  
-    c.nombre_categoria,
-    m.nombre AS nombre_marca,  
-    t.talla AS nombre_talla    
-  FROM 
-    producto p
-  INNER JOIN 
-    categoria c ON p.categoria_id = c.id_categoria  
-  INNER JOIN 
-    producto_detalle pd ON p.id_producto = pd.producto_id  
-  INNER JOIN 
-    marca m ON pd.marca_id = m.id_marca  
-  INNER JOIN 
-    talla t ON pd.talla_id = t.id_talla  
+  p.id_producto, 
+  p.nombre AS nombre_producto, 
+  p.descripcion, 
+  p.imagen_url, 
+  p.estado, 
+  pd.precio,  
+  c.nombre_categoria,
+  m.nombre AS nombre_marca,  
+  t.talla AS nombre_talla,
+  pd.stock,
+  pd.talla_id,  -- Incluyendo el campo talla_id y stock de producto_detalle
+  pd.id_detalle_producto
+FROM 
+  producto p
+INNER JOIN 
+  categoria c ON p.categoria_id = c.id_categoria  
+INNER JOIN 
+  producto_detalle pd ON p.id_producto = pd.producto_id  
+INNER JOIN 
+  marca m ON pd.marca_id = m.id_marca  
+INNER JOIN 
+  talla t ON pd.talla_id = t.id_talla;
+
     `);
 
     // Verifica si productos tienen nombre_categoria antes de enviarlo
@@ -336,57 +378,137 @@ export const listarUsuarios = async (req, res) => {
     res.status(500).json({ error: 'Error al cargar usuarios' });
   }
 };
-// controlador actualizarProducto
+// controlador actualizarProducto 
 export const actualizarProducto = async (req, res) => {
   const { id } = req.params;
   const { nombre, descripcion, imagen_url, estado, categoria_id, detalles } = req.body;
+
+  console.log('🔍 Datos recibidos para actualización:', {
+    id,
+    nombre,
+    descripcion,
+    imagen_url,
+    estado,
+    categoria_id,
+    detalles
+  });
 
   if (!nombre && !descripcion && !imagen_url && !estado && !categoria_id && !detalles) {
     return res.status(400).json({ message: 'No hay datos para actualizar' });
   }
 
+  const conn = await pool.getConnection();
+
   try {
-    // Buscar producto actual
-    const [productoActualArr] = await pool.query('SELECT * FROM producto WHERE id_producto = ?', [id]);
+    await conn.beginTransaction();
+
+    // 1. Buscar producto actual
+    const [productoActualArr] = await conn.query('SELECT * FROM producto WHERE id_producto = ?', [id]);
     if (productoActualArr.length === 0) {
+      await conn.rollback();
       return res.status(404).json({ message: 'Producto no encontrado' });
     }
 
     const productoActual = productoActualArr[0];
 
-    // Usar valores nuevos o mantener los anteriores si no vienen
+    // 2. Actualizar datos básicos del producto
     const nuevoNombre = nombre ?? productoActual.nombre;
     const nuevaDescripcion = descripcion ?? productoActual.descripcion;
     const nuevaImagenUrl = imagen_url ?? productoActual.imagen_url;
     const nuevoEstado = estado ?? productoActual.estado;
-    const nuevaCategoriaId = categoria_id ?? productoActual.categoria_id; // Corregí id_categoria
+    const nuevaCategoriaId = categoria_id ?? productoActual.categoria_id;
 
-    // Actualizar producto
-    const [result] = await pool.query(
+    await conn.query(
       `UPDATE producto SET nombre = ?, descripcion = ?, imagen_url = ?, estado = ?, categoria_id = ? WHERE id_producto = ?`,
       [nuevoNombre, nuevaDescripcion, nuevaImagenUrl, nuevoEstado, nuevaCategoriaId, id]
     );
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'Producto no encontrado' });
-    }
+    console.log('✅ Producto básico actualizado');
 
-    // Actualizar detalles si vienen
+    // 3. Manejar detalles (tallas) - ESTA ES LA PARTE CRÍTICA
     if (Array.isArray(detalles) && detalles.length > 0) {
-      for (const detalle of detalles) {
-        await pool.query(
-          `UPDATE producto_detalle SET marca_id = ?, talla_id = ?, precio = ?, stock = ? WHERE producto_id  = ?`,
-          [detalle.marca_id, detalle.talla_id, detalle.precio, detalle.stock, id]
+      console.log('🔍 Procesando detalles:', detalles);
+
+      // Obtener detalles existentes
+      const [detallesExistentes] = await conn.query(
+        'SELECT id_detalle_producto, marca_id, talla_id, precio, stock FROM producto_detalle WHERE producto_id = ?',
+        [id]
+      );
+
+      console.log('🔍 Detalles existentes en BD:', detallesExistentes);
+
+      // Separar detalles a actualizar vs crear nuevos
+      const detallesParaActualizar = [];
+      const detallesParaCrear = [];
+      const idsDetallesExistentes = detallesExistentes.map(detalle => detalle.id_detalle_producto);
+      const idsDetallesEnviados = [];
+
+      detalles.forEach(detalle => {
+        if (detalle.id_detalle_producto && detalle.id_detalle_producto !== null) {
+          // Detalle existente - actualizar
+          detallesParaActualizar.push(detalle);
+          idsDetallesEnviados.push(detalle.id_detalle_producto);
+        } else {
+          // Detalle nuevo - crear
+          detallesParaCrear.push(detalle);
+        }
+      });
+
+      console.log('🔍 Detalles para actualizar:', detallesParaActualizar);
+      console.log('🔍 Detalles para crear:', detallesParaCrear);
+
+      // Actualizar detalles existentes
+      for (const detalle of detallesParaActualizar) {
+        console.log('🔄 Actualizando detalle ID:', detalle.id_detalle_producto);
+        await conn.query(
+          `UPDATE producto_detalle SET marca_id = ?, talla_id = ?, precio = ?, stock = ? WHERE id_detalle_producto = ? AND producto_id = ?`,
+          [detalle.marca_id, detalle.talla_id, detalle.precio, detalle.stock, detalle.id_detalle_producto, id]
         );
+      }
+
+      // Crear nuevos detalles
+      for (const detalle of detallesParaCrear) {
+        console.log('➕ Creando nuevo detalle:', detalle);
+        await conn.query(
+          `INSERT INTO producto_detalle (producto_id, marca_id, talla_id, precio, stock) VALUES (?, ?, ?, ?, ?)`,
+          [id, detalle.marca_id, detalle.talla_id, detalle.precio, detalle.stock]
+        );
+      }
+
+      // Eliminar detalles que ya no están en la lista enviada
+      const detallesAEliminar = detallesExistentes.filter(detalle => !idsDetallesEnviados.includes(detalle.id_detalle_producto));
+      if (detallesAEliminar.length > 0) {
+        const detallesIdsAEliminar = detallesAEliminar.map(detalle => detalle.id_detalle_producto);
+        const placeholders = detallesIdsAEliminar.map(() => '?').join(',');
+        await conn.query(
+          `DELETE FROM producto_detalle WHERE producto_id = ? AND id_detalle_producto IN (${placeholders})`,
+          [id, ...detallesIdsAEliminar]
+        );
+        console.log('🗑️ Detalles eliminados que no están en la lista enviada');
       }
     }
 
-    res.status(200).json({ message: 'Producto actualizado con éxito' });
+    await conn.commit();
+    console.log('✅ Transacción completada exitosamente');
+
+    res.status(200).json({
+      message: 'Producto actualizado con éxito',
+      producto_id: id
+    });
+
   } catch (error) {
-    console.error('Error al actualizar el producto:', error);
-    res.status(500).json({ message: 'Error interno del servidor' });
+    await conn.rollback();
+    console.error('❌ Error al actualizar el producto:', error);
+    res.status(500).json({
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  } finally {
+    conn.release();
   }
 };
+
+
 // Controlador para actualizar el estado del usuario
 export const actualizarEstadoUsuario = async (req, res) => {
   const { id } = req.params; // Obtén el id del usuario desde los parámetros
@@ -416,3 +538,4 @@ export const actualizarEstadoUsuario = async (req, res) => {
     res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
+

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import '../Styles/AdminPanel.css'; // Asegúrate de tener este archivo CSS
 
@@ -16,6 +16,9 @@ const AdminPanel = () => {
           </li>
           <li className="admin-nav-item">
             <Link to="/admin/AgregarProducto" className="admin-nav-link">Agregar Producto</Link>
+          </li>
+          <li className="admin-nav-item">
+            <Link to="/admin/agregar-talla/:id_producto" className="admin-nav-link">Agregar Talla</Link> {/* Aquí agregamos la opción */}
           </li>
           <li className="admin-nav-item">
             <Link to="/admin/AdminUsuarios" className="admin-nav-link">Listar Usuarios</Link>

@@ -11,7 +11,9 @@ const ProductosPorCategoria = () => {
     fetch(`http://localhost:3000/api/productos/categoria/${id}`)
       .then(res => res.json())
       .then(data => {
-        setProductos(data);
+        // Agrupar productos por nombre para evitar duplicados
+        const productosUnicos = agruparProductosPorNombre(data || []);
+        setProductos(productosUnicos);
         setLoading(false);
       })
       .catch(err => {
@@ -26,6 +28,30 @@ const ProductosPorCategoria = () => {
       })
       .catch(() => setNombreCategoria('Categoría'));
   }, [id]);
+
+  // Función para agrupar productos por nombre y seleccionar el primero de cada grupo
+  const agruparProductosPorNombre = (productos) => {
+    const productosMap = new Map();
+    
+    productos.forEach(producto => {
+      // Usar el nombre del producto como clave para agrupar
+      const clave = producto.nombre_producto;
+      
+      // Si no existe el producto en el Map, lo agregamos
+      if (!productosMap.has(clave)) {
+        productosMap.set(clave, producto);
+      } else {
+        // Si ya existe, podemos optar por mantener el de menor precio
+        // o cualquier otra lógica que prefieras
+        const productoExistente = productosMap.get(clave);
+        if (producto.precio < productoExistente.precio) {
+          productosMap.set(clave, producto);
+        }
+      }
+    });
+    
+    return Array.from(productosMap.values());
+  };
 
   if (loading) return <p className="text-center mt-10">Cargando productos...</p>;
   if (productos.length === 0) return <p className="text-center mt-10">No hay productos en esta categoría.</p>;

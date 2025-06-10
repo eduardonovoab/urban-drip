@@ -20,6 +20,7 @@ import ProtectedRoute from './ProtectedRoute';
 import ProductosPorCategoria from '../components/ProductosPorCategoria';
 import ProductosPorMarca from '../components/ProductosPorMarca';
 import DetalleProducto from '../components/DetalleProducto';
+import AgregarTallaProducto from '../pages/AgregarTallaProducto';
 
 import { AuthContext } from '../context/AuthContext';
 
@@ -50,11 +51,17 @@ const AppRoutes = () => {
       } />
 
       {/* Rutas protegidas - Admin */}
+      <Route path="/admin/agregar-talla/:id_producto" element={
+        <ProtectedRoute allowedRoles={['admin']}>
+          <AgregarTallaProducto />
+        </ProtectedRoute>
+      } />
       <Route path="/admin/editar/:id" element={
         <ProtectedRoute allowedRoles={['admin']}>
           <EditarProducto />
         </ProtectedRoute>
       } />
+      
       <Route path="/admin/ListarProductos" element={
         <ProtectedRoute allowedRoles={['admin']}>
           <ListarProductos />

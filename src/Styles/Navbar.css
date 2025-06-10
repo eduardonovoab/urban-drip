@@ -1,4 +1,4 @@
-/* NavBar.css - Estilos base existentes + Carrito mejorado */
+/* NavBar.css - Estilos base mejorados + Carrito flotante */
 
 .navbar-container {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -14,6 +14,11 @@
 .navbar-logo img {
   height: 40px;
   width: auto;
+  transition: transform 0.3s ease;
+}
+
+.navbar-logo img:hover {
+  transform: scale(1.05);
 }
 
 .navbar-menu {
@@ -22,6 +27,7 @@
   gap: 2rem;
 }
 
+/* Enlaces de navegación base */
 .nav-link {
   color: white;
   text-decoration: none;
@@ -29,13 +35,44 @@
   transition: all 0.3s ease;
   padding: 0.5rem 1rem;
   border-radius: 6px;
+  display: inline-block;
 }
 
 .nav-link:hover {
   background: rgba(255, 255, 255, 0.1);
   transform: translateY(-1px);
+  color: white;
 }
 
+/* Botón de Login mejorado */
+.login-btn {
+  background: none;
+  border: none;
+  color: white;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-1px);
+  color: white;
+}
+
+.login-btn:focus {
+  outline: 2px solid rgba(255, 255, 255, 0.3);
+  outline-offset: 2px;
+}
+
+/* Dropdown para productos */
 .dropdown-button {
   color: white;
   background: none;
@@ -48,10 +85,16 @@
   padding: 0.5rem 1rem;
   border-radius: 6px;
   transition: all 0.3s ease;
+  font-size: inherit;
 }
 
 .dropdown-button:hover {
   background: rgba(255, 255, 255, 0.1);
+}
+
+.dropdown-button:focus {
+  outline: 2px solid rgba(255, 255, 255, 0.3);
+  outline-offset: 2px;
 }
 
 .dropdown-arrow {
@@ -71,9 +114,10 @@
   background: white;
   border-radius: 8px;
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-  min-width: 200px;
+  min-width: 220px;
   z-index: 1001;
   margin-top: 0.5rem;
+  overflow: hidden;
 }
 
 .dropdown-menu ul {
@@ -87,14 +131,18 @@
   padding: 0.75rem 1rem;
   color: #2c3e50;
   text-decoration: none;
-  transition: background-color 0.2s ease;
+  transition: all 0.2s ease;
+  border-left: 3px solid transparent;
 }
 
 .dropdown-item:hover {
   background: #f8f9fa;
   color: #667eea;
+  border-left-color: #667eea;
+  padding-left: 1.2rem;
 }
 
+/* Sección de usuario */
 .user-section {
   display: flex;
   align-items: center;
@@ -104,22 +152,44 @@
 .welcome-text {
   color: white;
   font-weight: 500;
+  font-size: 0.9rem;
 }
 
 .logout-btn {
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  transition: all 0.3s ease;
 }
 
+.logout-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.logout-btn:focus {
+  outline: 2px solid rgba(255, 255, 255, 0.3);
+  outline-offset: 2px;
+}
+
+/* Icono de perfil */
 .profile-icon {
   color: white;
   font-size: 1.5rem;
   transition: all 0.3s ease;
+  text-decoration: none;
+  padding: 0.25rem;
+  border-radius: 50%;
 }
 
 .profile-icon:hover {
   color: #ffd700;
   transform: scale(1.1);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 /* CARRITO FLOTANTE MEJORADO */
@@ -180,6 +250,7 @@
   z-index: 1002;
   overflow: hidden;
   animation: slideDown 0.3s ease;
+  border: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 @keyframes slideDown {
@@ -219,16 +290,41 @@
   cursor: pointer;
   padding: 0.25rem;
   border-radius: 4px;
-  transition: background 0.2s ease;
+  transition: all 0.2s ease;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .cart-close:hover {
   background: rgba(255, 255, 255, 0.1);
+  transform: scale(1.1);
 }
 
 .cart-content {
   max-height: 400px;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e0 #f8f9fa;
+}
+
+.cart-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.cart-content::-webkit-scrollbar-track {
+  background: #f8f9fa;
+}
+
+.cart-content::-webkit-scrollbar-thumb {
+  background: #cbd5e0;
+  border-radius: 3px;
+}
+
+.cart-content::-webkit-scrollbar-thumb:hover {
+  background: #a0aec0;
 }
 
 /* Loading State */
@@ -288,7 +384,7 @@
   align-items: center;
   padding: 0.75rem 1.25rem;
   border-bottom: 1px solid #e9ecef;
-  transition: background-color 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .cart-item-mini:hover {
@@ -306,12 +402,18 @@
   overflow: hidden;
   margin-right: 0.75rem;
   flex-shrink: 0;
+  border: 1px solid #e9ecef;
 }
 
 .item-image img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.item-image:hover img {
+  transform: scale(1.05);
 }
 
 .item-details {
@@ -333,6 +435,7 @@
   display: flex;
   gap: 0.5rem;
   margin-bottom: 0.25rem;
+  flex-wrap: wrap;
 }
 
 .item-size,
@@ -342,6 +445,7 @@
   background: #e9ecef;
   padding: 2px 6px;
   border-radius: 3px;
+  white-space: nowrap;
 }
 
 .item-price {
@@ -359,11 +463,17 @@
   border-radius: 4px;
   transition: all 0.2s ease;
   margin-left: 0.5rem;
+  flex-shrink: 0;
 }
 
 .item-remove:hover {
   background: #ffeaea;
   transform: scale(1.1);
+}
+
+.item-remove:focus {
+  outline: 2px solid #dc3545;
+  outline-offset: 2px;
 }
 
 .more-items {
@@ -372,6 +482,7 @@
   color: #6c757d;
   font-style: italic;
   border-top: 1px solid #e9ecef;
+  background: #f8f9fa;
 }
 
 /* Cart Summary */
@@ -384,13 +495,20 @@
 .summary-line {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   margin-bottom: 0.5rem;
   font-size: 0.9rem;
+}
+
+.summary-line strong {
+  color: #2c3e50;
+  font-size: 1rem;
 }
 
 .summary-shipping {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   font-size: 0.85rem;
   color: #6c757d;
 }
@@ -405,7 +523,8 @@
   padding: 1rem 1.25rem;
   display: flex;
   gap: 0.75rem;
-  background: #f8f9fa;
+  background: white;
+  border-top: 1px solid #e9ecef;
 }
 
 .btn-view-cart,
@@ -432,6 +551,7 @@
 .btn-view-cart:hover:not(:disabled) {
   background: #5a6268;
   transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(108, 117, 125, 0.3);
 }
 
 .btn-checkout {
@@ -449,9 +569,26 @@
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
+  box-shadow: none;
 }
 
-/* Responsive */
+.btn-view-cart:focus,
+.btn-checkout:focus {
+  outline: 2px solid rgba(0, 0, 0, 0.2);
+  outline-offset: 2px;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .navbar-menu {
+    gap: 1.5rem;
+  }
+  
+  .cart-dropdown {
+    width: 350px;
+  }
+}
+
 @media (max-width: 768px) {
   .navbar-container {
     padding: 1rem;
@@ -460,31 +597,44 @@
   
   .navbar-menu {
     gap: 1rem;
+    flex-wrap: wrap;
   }
   
   .cart-dropdown {
     width: 320px;
-    right: -50px;
+    right: -20px;
   }
   
   .user-section {
     flex-direction: column;
     gap: 0.5rem;
+    align-items: flex-start;
   }
   
   .welcome-text {
+    font-size: 0.85rem;
+  }
+  
+  .nav-link,
+  .login-btn {
     font-size: 0.9rem;
+    padding: 0.4rem 0.8rem;
   }
 }
 
 @media (max-width: 480px) {
+  .navbar-container {
+    padding: 0.75rem;
+  }
+  
   .cart-dropdown {
     width: 280px;
-    right: -80px;
+    right: -40px;
   }
   
   .cart-actions {
     flex-direction: column;
+    gap: 0.5rem;
   }
   
   .item-name {
@@ -495,8 +645,63 @@
     gap: 0.5rem;
   }
   
-  .nav-link {
+  .nav-link,
+  .login-btn {
     padding: 0.25rem 0.5rem;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+  }
+  
+  .welcome-text {
+    font-size: 0.8rem;
+  }
+  
+  .item-specs {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+}
+
+/* Mejoras de accesibilidad */
+@media (prefers-reduced-motion: reduce) {
+  .cart-dropdown {
+    animation: none;
+  }
+  
+  .cart-badge {
+    animation: none;
+  }
+  
+  .loading-spinner-small {
+    animation: none;
+  }
+  
+  * {
+    transition: none !important;
+  }
+}
+
+/* Estados de focus mejorados */
+.nav-link:focus,
+.dropdown-button:focus,
+.cart-icon:focus {
+  outline: 2px solid rgba(255, 255, 255, 0.5);
+  outline-offset: 2px;
+}
+
+/* Hover states más consistentes */
+.nav-link:hover,
+.login-btn:hover,
+.dropdown-button:hover {
+  text-decoration: none;
+}
+
+/* Mejora para pantallas táctiles */
+@media (hover: none) {
+  .nav-link:hover,
+  .login-btn:hover,
+  .dropdown-button:hover,
+  .cart-icon:hover {
+    transform: none;
+    background: rgba(255, 255, 255, 0.1);
   }
 }

@@ -1,87 +1,42 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import React, { useEffect } from 'react';
+import { useCart } from '../context/CartContext'; // Usar el mismo contexto que navbar
 import { toast } from 'react-toastify';
 import '../styles/Cart.css';
 
 const Cart = () => {
-  const [carrito, setCarrito] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  // Función para cargar el carrito desde la API
-  const fetchCarrito = async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('token');
-      const res = await axios.get('http://localhost:3000/api/cliente/carrito', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-          // 🔍 AGREGAR ESTE CONSOLE.LOG PARA VER LOS DATOS
-    console.log('Datos completos del carrito:', res.data);
-    console.log('Primer producto:', res.data.productos[0]);
-      // Mapear para agregar una key única para React (id + talla si existe)
-      const productosUnicos = res.data.productos.map((item, index) => ({
-        ...item,
-        uniqueKey: `${item.id_detalle_producto}-${index}`,
-      }));
-      setCarrito(productosUnicos);
-    } catch (error) {
-      toast.error('Error al cargar el carrito');
-      console.error('Error al obtener carrito:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { 
+    carrito, 
+    carritoLoading, 
+    initialized,
+    fetchCarrito, 
+    eliminarDelCarrito, 
+    calcularTotal,
+    cantidadTotal,
+    limpiarCarrito,
+    realizarCompra
+  } = useCart(); // Usar el contexto del carrito
 
   useEffect(() => {
-    fetchCarrito();
-  }, []);
+    // Cargar el carrito si no está inicializado
+    if (!initialized) {
+      fetchCarrito(true);
+    }
+  }, [initialized, fetchCarrito]);
 
   // Eliminar una unidad o producto completo del carrito
   const eliminarProducto = async (detalle_producto_id) => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await axios.delete(`http://localhost:3000/api/cliente/carrito/${detalle_producto_id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      toast.success(res.data.message);
-      // Recargar carrito
-      fetchCarrito();
-    } catch (error) {
-      toast.error('Error al eliminar producto del carrito');
-      console.error('Error al eliminar producto:', error);
-    }
+    await eliminarDelCarrito(detalle_producto_id);
   };
 
-  // Realizar la compra
-  const realizarCompra = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const carritoParaEnvio = carrito.map(({ uniqueKey, ...item }) => item);
-      const res = await axios.post(
-        'http://localhost:3000/api/cliente/comprar',
-        { carrito: carritoParaEnvio },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-      toast.success(res.data.message);
-      setCarrito([]);
-    } catch (error) {
-      toast.error('Error al realizar la compra');
-      console.error('Error al realizar la compra:', error);
-    }
+  // Realizar la compra usando el contexto
+  const handleRealizarCompra = async () => {
+    await realizarCompra();
   };
 
-  // Calcular total del carrito
-  const total = carrito.reduce((acc, item) => acc + item.precio * item.cantidad, 0);
+  // Calcular total del carrito usando el contexto
+  const total = calcularTotal();
 
-  if (loading) {
+  if (carritoLoading) {
     return (
       <div className="cart-container">
         <div className="loading-spinner">
@@ -117,7 +72,7 @@ const Cart = () => {
         <div className="cart-content">
           <div className="cart-items">
             {carrito.map((item) => (
-              <div key={item.uniqueKey} className="cart-item">
+              <div key={`${item.id_detalle_producto}-${item.talla || 'notalla'}`} className="cart-item">
                 <div className="product-image-container">
                   <img 
                     src={item.imagen_url || '/placeholder-image.jpg'} 
@@ -171,7 +126,7 @@ const Cart = () => {
               <h3 className="summary-title">Resumen del pedido</h3>
               
               <div className="summary-line">
-                <span>Subtotal ({carrito.length} producto{carrito.length > 1 ? 's' : ''})</span>
+                <span>Subtotal ({cantidadTotal()} producto{cantidadTotal() > 1 ? 's' : ''})</span>
                 <span>${total.toLocaleString('es-CL')}</span>
               </div>
               
@@ -188,7 +143,7 @@ const Cart = () => {
               </div>
 
               <button
-                onClick={realizarCompra}
+                onClick={handleRealizarCompra}
                 className="checkout-btn"
                 disabled={carrito.length === 0}
               >

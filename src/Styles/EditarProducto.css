@@ -36,6 +36,7 @@ select {
   padding: 10px;
   border-radius: 5px;
   border: 1px solid #ccc;
+  font-size: 1rem; /* Aumentar tamaño de fuente */
 }
 
 textarea {
@@ -50,10 +51,16 @@ button {
   border-radius: 5px;
   cursor: pointer;
   transition: background-color 0.3s;
+  font-size: 1rem; /* Tamaño de fuente más grande para mejor legibilidad */
 }
 
 button:hover {
   background-color: #45a049;
+}
+
+button:disabled {
+  background-color: #ddd;
+  cursor: not-allowed;
 }
 
 .detalles-container {
@@ -67,7 +74,119 @@ button:hover {
   color: white;
 }
 
-button:disabled {
-  background-color: #ddd;
-  cursor: not-allowed;
+.detalles-section {
+  margin-top: 2rem;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1); /* Añadir sombra */
+}
+
+.detalles-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.btn-add-talla {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.3s; /* Efecto de transición */
+}
+
+.btn-add-talla:hover {
+  background-color: #218838;
+}
+
+.detalles-container {
+  background: white;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.detalle-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #eee;
+}
+
+.btn-remove-talla {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: background-color 0.3s; /* Efecto de transición */
+}
+
+.btn-remove-talla:hover {
+  background-color: #c82333;
+}
+
+.imagen-preview {
+  max-width: 100px;
+  max-height: 100px;
+  margin-top: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.error-text {
+  color: #dc3545;
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+}
+
+/* Añadir responsive design para dispositivos más pequeños */
+@media (max-width: 768px) {
+  .editar-producto-container {
+    padding: 15px;
+  }
+
+  .formulario-editar-producto {
+    width: 100%;
+  }
+
+  .input-container {
+    margin-bottom: 10px;
+  }
+
+  label {
+    font-size: 0.9rem;
+  }
+
+  input,
+  textarea,
+  select {
+    padding: 8px;
+    font-size: 0.9rem;
+  }
+
+  button {
+    font-size: 1rem;
+    padding: 12px 25px;
+  }
+
+  .detalles-section {
+    margin-top: 1rem;
+    padding: 0.5rem;
+  }
+
+  .btn-add-talla,
+  .btn-remove-talla {
+    padding: 0.3rem 0.7rem;
+  }
 }

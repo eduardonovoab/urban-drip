@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import { useCart } from '../context/CartContext'; // Importar el contexto del carrito
 import { toast } from 'react-toastify';
 import '../styles/NavBar.css';
 
 const Navbar = () => {
   const { user, logout } = useContext(AuthContext);
+  const { carrito, carritoLoading, initialized, fetchCarrito, eliminarDelCarrito, calcularTotal, cantidadTotal, limpiarCarrito } = useCart();  // Usar el contexto del carrito
+
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [categorias, setCategorias] = useState([]);
-  const [carrito, setCarrito] = useState([]);
   const [carritoVisible, setCarritoVisible] = useState(false);
-  const [carritoLoading, setCarritoLoading] = useState(false);
   const dropdownRef = useRef(null);
   const carritoRef = useRef(null);
   const navigate = useNavigate();
@@ -31,10 +32,13 @@ const Navbar = () => {
       });
 
     // Cargar carrito solo si el usuario está logueado
-    if (user) {
-      fetchCarrito();
+    if (user && !initialized) {
+      fetchCarrito(true); // Solo mostrar loading en la carga inicial
+    } else if (!user) {
+      // Limpiar carrito si no hay usuario
+      limpiarCarrito();
     }
-  }, [user]);
+  }, [user, initialized, fetchCarrito, limpiarCarrito]);
 
   // Cerrar dropdowns al hacer click fuera
   useEffect(() => {
@@ -53,57 +57,6 @@ const Navbar = () => {
     };
   }, []);
 
-  const fetchCarrito = async () => {
-    setCarritoLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      
-      if (!token) {
-        console.warn('No hay token disponible');
-        setCarrito([]);
-        return;
-      }
-
-      const response = await fetch('http://localhost:3000/api/cliente/carrito', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          console.warn('Endpoint del carrito no encontrado - probablemente no implementado aún');
-          setCarrito([]);
-          return;
-        }
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('La respuesta no es JSON válido');
-      }
-
-      const data = await response.json();
-      setCarrito(data.productos || []);
-      
-    } catch (err) {
-      console.error('Error al cargar el carrito:', err);
-      
-      if (err.message.includes('404') || err.message.includes('not found')) {
-        console.warn('El endpoint del carrito aún no está implementado');
-      } else {
-        toast.error('Error al cargar el carrito');
-      }
-      
-      setCarrito([]);
-    } finally {
-      setCarritoLoading(false);
-    }
-  };
-
   const toggleCarrito = () => {
     setCarritoVisible(!carritoVisible);
   };
@@ -113,32 +66,13 @@ const Navbar = () => {
     setCarritoVisible(false);
   };
 
-  const eliminarProductoCarrito = async (detalle_producto_id) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3000/api/cliente/carrito/${detalle_producto_id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        toast.success('Producto eliminado del carrito');
-        fetchCarrito(); // Recargar carrito
-      } else {
-        toast.error('Error al eliminar el producto');
-      }
-    } catch (error) {
-      toast.error('Error al eliminar el producto');
-      console.error('Error:', error);
-    }
+  const handleEliminarProducto = async (detalle_producto_id) => {
+    await eliminarDelCarrito(detalle_producto_id);
   };
 
-  // Calcular total del carrito
-  const calcularTotal = () => {
-    return carrito.reduce((total, item) => total + (item.precio * item.cantidad), 0);
+  const handleLoginClick = () => {
+    // Redirige al login al hacer clic en "Ingresar"
+    navigate('/login');
   };
 
   return (
@@ -194,7 +128,7 @@ const Navbar = () => {
             <button onClick={logout} className="nav-link logout-btn">Cerrar sesión</button>
           </div>
         ) : (
-          <Link to="/login" className="nav-link">Ingresar</Link>
+          <button onClick={handleLoginClick} className="nav-link">Ingresar</button> 
         )}
 
         <Link to="/perfil" className="profile-icon" title="Perfil">
@@ -206,7 +140,7 @@ const Navbar = () => {
             <div onClick={toggleCarrito} className="cart-icon">
               <i className="fas fa-shopping-cart"></i>
               {carrito.length > 0 && (
-                <span className="cart-badge">{carritoLoading ? '...' : carrito.length}</span>
+                <span className="cart-badge">{initialized ? carrito.length : '...'}</span>
               )}
             </div>
 
@@ -224,7 +158,7 @@ const Navbar = () => {
                 </div>
 
                 <div className="cart-content">
-                  {carritoLoading ? (
+                  {!initialized ? (
                     <div className="cart-loading">
                       <div className="loading-spinner-small"></div>
                       <p>Cargando carrito...</p>
@@ -261,7 +195,7 @@ const Navbar = () => {
                               className="item-remove"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                eliminarProductoCarrito(item.id_detalle_producto);
+                                handleEliminarProducto(item.id_detalle_producto);
                               }}
                               title="Eliminar producto"
                             >
@@ -279,7 +213,7 @@ const Navbar = () => {
 
                       <div className="cart-summary-mini">
                         <div className="summary-line">
-                          <span>Subtotal ({carrito.length} producto{carrito.length > 1 ? 's' : ''})</span>
+                          <span>Subtotal ({cantidadTotal()} producto{cantidadTotal() > 1 ? 's' : ''})</span>
                           <strong>${calcularTotal().toLocaleString('es-CL')}</strong>
                         </div>
                         <div className="summary-shipping">
@@ -295,7 +229,7 @@ const Navbar = () => {
                   <button 
                     className="btn-view-cart" 
                     onClick={goToCart}
-                    disabled={carritoLoading || carrito.length === 0}
+                    disabled={!initialized || carrito.length === 0}
                   >
                     <i className="fas fa-shopping-cart"></i>
                     Ver Carrito
@@ -303,7 +237,7 @@ const Navbar = () => {
                   <button 
                     className="btn-checkout" 
                     onClick={goToCart}
-                    disabled={carritoLoading || carrito.length === 0}
+                    disabled={!initialized || carrito.length === 0}
                   >
                     <i className="fas fa-credit-card"></i>
                     Finalizar Compra

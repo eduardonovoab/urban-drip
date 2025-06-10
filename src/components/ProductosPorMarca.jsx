@@ -11,7 +11,9 @@ const ProductosPorMarca = () => {
     fetch(`http://localhost:3000/api/productos/marca/${id}`)
       .then(res => res.json())
       .then(data => {
-        setProductos(data.productos || []);
+        // Agrupar productos por nombre para evitar duplicados
+        const productosUnicos = agruparProductosPorNombre(data.productos || []);
+        setProductos(productosUnicos);
         setMarcaNombre(data.marcaNombre || '');
         setLoading(false);
       })
@@ -20,6 +22,30 @@ const ProductosPorMarca = () => {
         setLoading(false);
       });
   }, [id]);
+
+  // Función para agrupar productos por nombre y seleccionar el primero de cada grupo
+  const agruparProductosPorNombre = (productos) => {
+    const productosMap = new Map();
+    
+    productos.forEach(producto => {
+      // Usar el nombre del producto como clave para agrupar
+      const clave = producto.nombre;
+      
+      // Si no existe el producto en el Map, lo agregamos
+      if (!productosMap.has(clave)) {
+        productosMap.set(clave, producto);
+      } else {
+        // Si ya existe, podemos optar por mantener el de menor precio
+        // o cualquier otra lógica que prefieras
+        const productoExistente = productosMap.get(clave);
+        if (producto.precio < productoExistente.precio) {
+          productosMap.set(clave, producto);
+        }
+      }
+    });
+    
+    return Array.from(productosMap.values());
+  };
 
   if (loading) return <p className="text-center mt-10">Cargando productos...</p>;
   if (productos.length === 0) return <p className="text-center mt-10">No hay productos para esta marca.</p>;
@@ -63,7 +89,7 @@ const ProductosPorMarca = () => {
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          height: 2.4rem; /* Limita la altura máxima para que todos los títulos tengan el mismo tamaño */
+          height: 2.4rem;
         }
         .producto-precio {
           margin-top: 6px;
@@ -88,7 +114,6 @@ const ProductosPorMarca = () => {
           }
         }
       `}</style>
-
       <section>
         <h2 style={{ textAlign: 'center', marginBottom: '30px', color: '#000', fontSize: '2rem' }}>
           {marcaNombre}
@@ -97,7 +122,7 @@ const ProductosPorMarca = () => {
           {productos.map((prod) => (
             <Link
               key={prod.id_detalle_producto}
-              to={`/producto/${prod.id_detalle_producto}`} // Ruta al detalle del producto
+              to={`/producto/${prod.id_detalle_producto}`}
               className="producto-item"
               title={prod.nombre}
             >

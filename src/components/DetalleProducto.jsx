@@ -1,36 +1,30 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useCart } from '../context/CartContext';
 import { toast } from 'react-toastify';
-import '../styles/DetalleProducto.css'; // Mantén el estilo que ya tienes
+import '../Styles/DetalleProducto.css';
 
 const DetalleProducto = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { agregarAlCarrito } = useCart();
 
   const [producto, setProducto] = useState(null);
   const [tallasDisponibles, setTallasDisponibles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [mostrarTallas, setMostrarTallas] = useState(false);
-  const [tallaSeleccionada, setTallaSeleccionada] = useState({ id: '', nombre: '' });
-  const [rol, setRol] = useState('');
+  const [tallaSeleccionada, setTallaSeleccionada] = useState({ id: '', nombre: '', stock: 0 });
+  const [agregandoCarrito, setAgregandoCarrito] = useState(false);
 
   useEffect(() => {
-    const usuario = JSON.parse(localStorage.getItem('usuario'));
-    
-    if (usuario) {
-      setRol(usuario.rol);  // Guardamos el rol de usuario
-    }
-
     setLoading(true);
 
-    // Obtener detalle del producto
     fetch(`http://localhost:3000/api/producto-detalle/${id}`)
       .then(res => res.json())
       .then(data => {
         setProducto(data);
         setLoading(false);
 
-        // Obtener las tallas disponibles para el producto
         return fetch(`http://localhost:3000/api/producto-detalles/producto/${data.id_producto}`);
       })
       .then(res => res.json())
@@ -45,61 +39,52 @@ const DetalleProducto = () => {
   }, [id]);
 
   const handleAgregarAlCarrito = async () => {
-    // Validación de que se seleccionó una talla
     if (!tallaSeleccionada.id) {
       toast.error('Por favor, selecciona una talla antes de agregar al carrito.');
       return;
     }
 
-    if (rol !== 'cliente') {
-      toast.error('Solo los usuarios con rol cliente pueden agregar productos al carrito');
-      return;
-    }
-
-    const token = localStorage.getItem('token');
-    if (!token) {
-      toast.error('Error: Usuario no autenticado');
-      return;
-    }
-
-    const requestBody = {
-      detalle_producto_id: tallaSeleccionada.id, // Usamos el id_detalle_producto como el identificador
-      cantidad: 1, // Asegúrate de manejar la cantidad según lo necesites
-    };
+    setAgregandoCarrito(true);
 
     try {
-      const response = await fetch('http://localhost:3000/api/cliente/carrito', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        toast.success(data.message);
-      } else {
-        toast.error(data.message || 'Error al agregar al carrito');
+      const success = await agregarAlCarrito(tallaSeleccionada.id, 1);
+      
+      if (success) {
+        toast.success('Producto agregado al carrito');
       }
     } catch (error) {
-      toast.error('Error al agregar al carrito');
-      console.error('Error al agregar al carrito:', error);
+      console.error('Error inesperado:', error);
+      toast.error('Error inesperado al agregar al carrito');
+    } finally {
+      setAgregandoCarrito(false);
     }
   };
 
   const handleSeleccionarTalla = (detalle) => {
     setTallaSeleccionada({
       id: detalle.id_detalle_producto,
-      nombre: detalle.talla
+      nombre: detalle.talla,
+      stock: detalle.stock
     });
-    setMostrarTallas(false); // Cerrar el dropdown después de seleccionar
+    setMostrarTallas(false);
   };
 
-  if (loading) return <p className="text-center mt-10">Cargando detalle del producto...</p>;
-  if (!producto) return <p className="text-center mt-10">Producto no encontrado.</p>;
+  if (loading) {
+    return (
+      <div className="loading-container">
+        <div className="loading-spinner"></div>
+        <p>Cargando detalle del producto...</p>
+      </div>
+    );
+  }
+
+  if (!producto) {
+    return (
+      <div className="error-container">
+        <p>Producto no encontrado.</p>
+      </div>
+    );
+  }
 
   return (
     <section className="detalle-producto-container">
@@ -107,47 +92,66 @@ const DetalleProducto = () => {
         &larr; Volver a {producto.nombre_categoria || 'Categoría'}
       </Link>
 
-      <h2 className="producto-title">{producto.nombre_producto}</h2>
+      <div className="producto-content">
+        <div className="producto-image-container">
+          <img src={producto.imagen_url} alt={producto.nombre_producto} className="producto-img" />
+        </div>
 
-      <div className="producto-image-container">
-        <img src={producto.imagen_url} alt={producto.nombre_producto} className="producto-img" />
+        <div className="producto-info">
+          <h1 className="producto-title">{producto.nombre_producto}</h1>
+          <div className="producto-precio">${Number(producto.precio).toLocaleString('es-CL')}</div>
+
+          <div className="talla-selector-container">
+            <label className="talla-label">Selecciona tu talla:</label>
+            <button
+              onClick={() => setMostrarTallas(!mostrarTallas)}
+              className={`talla-button ${tallaSeleccionada.nombre ? 'selected' : ''} ${mostrarTallas ? 'open' : ''}`}
+            >
+              <span>
+                {tallaSeleccionada.nombre ? `Talla: ${tallaSeleccionada.nombre}` : 'Seleccionar talla'}
+              </span>
+            </button>
+
+            {mostrarTallas && (
+              <ul className="talla-list">
+                {tallasDisponibles.map(detalle => (
+                  <li
+                    key={detalle.id_detalle_producto}
+                    className={`talla-item ${detalle.id_detalle_producto === tallaSeleccionada.id ? 'active' : ''}`}
+                    onClick={() => handleSeleccionarTalla(detalle)}
+                  >
+                    <span>Talla {detalle.talla}</span>
+                    <span className={`stock-badge ${detalle.stock <= 3 ? 'very-low' : detalle.stock <= 10 ? 'low' : ''}`}>
+                      {detalle.stock} disponibles
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {tallaSeleccionada.nombre && (
+            <div className="stock-info selected">
+              Stock disponible para talla {tallaSeleccionada.nombre}: {tallaSeleccionada.stock} unidades
+            </div>
+          )}
+
+          <button 
+            onClick={handleAgregarAlCarrito} 
+            className="btn-agregar"
+            disabled={agregandoCarrito || !tallaSeleccionada.id}
+          >
+            {agregandoCarrito ? 'Agregando...' : 'Agregar al carrito'}
+          </button>
+
+          {producto.descripcion && (
+            <div className="producto-description">
+              <strong>Descripción:</strong><br />
+              {producto.descripcion}
+            </div>
+          )}
+        </div>
       </div>
-
-      <p className="producto-precio">${Number(producto.precio).toLocaleString('es-CL')}</p>
-
-      <div className="talla-selector-container">
-        <button
-          onClick={() => setMostrarTallas(!mostrarTallas)}
-          className="talla-button"
-        >
-          {tallaSeleccionada.nombre ? `Talla seleccionada: ${tallaSeleccionada.nombre}` : 'Seleccionar talla'}
-        </button>
-
-        {mostrarTallas && (
-          <ul className="talla-list">
-            {tallasDisponibles.map(detalle => (
-              <li
-                key={detalle.id_detalle_producto}
-                className={`talla-item ${detalle.id_detalle_producto === tallaSeleccionada.id ? 'active' : ''}`}
-                onClick={() => handleSeleccionarTalla(detalle)}
-              >
-                {detalle.talla} — Stock: {detalle.stock ?? '0'}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      {rol === 'cliente' ? (
-        <button onClick={handleAgregarAlCarrito} className="btn-agregar">
-          Agregar al carrito
-        </button>
-      ) : (
-        <p>Debes ser cliente para agregar al carrito.</p>
-      )}
-
-      <p className="stock-info">Stock disponible: {producto.stock ?? 'No disponible'}</p>
-      <p className="producto-description">{producto.descripcion}</p>
     </section>
   );
 };

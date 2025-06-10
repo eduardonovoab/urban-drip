@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { ToastContainer, toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter, Edit, Power, Eye, Package, TrendingUp, AlertCircle, Tag, ShoppingBag, Grid, List } from 'lucide-react';
-import '../Styles/ListarProductos.css'; // Importando los estilos
+import { Package, Grid, List } from 'lucide-react';
+import '../Styles/ListarProductos.css';
 
 const ListarProductos = () => {
   const [productos, setProductos] = useState([]);
@@ -12,6 +12,7 @@ const ListarProductos = () => {
   const [busqueda, setBusqueda] = useState('');
   const [loading, setLoading] = useState(true);
   const [vistaGrid, setVistaGrid] = useState(true);
+  const [productosExpandidos, setProductosExpandidos] = useState({});
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -23,7 +24,9 @@ const ListarProductos = () => {
           const response = await axios.get('http://localhost:3000/api/admin/producto', {
             headers: { Authorization: `Bearer ${token}` }
           });
-          setProductos(response.data);
+          // Agrupar productos por id_producto
+          const productosAgrupados = agruparProductosPorId(response.data);
+          setProductos(productosAgrupados);
         } catch (error) {
           console.error('Error al cargar productos:', error);
           toast.error('Error al cargar productos');
@@ -37,6 +40,30 @@ const ListarProductos = () => {
       toast.error('No estás autenticado');
     }
   }, []);
+
+  const agruparProductosPorId = (productos) => {
+    const productosMap = new Map();
+    productos.forEach((producto) => {
+      const idProducto = producto.id_producto;
+      if (!productosMap.has(idProducto)) {
+        productosMap.set(idProducto, {
+          ...producto,
+          detalles: [producto],  // Inicia con el detalle de la primera talla
+        });
+      } else {
+        const productoExistente = productosMap.get(idProducto);
+        productoExistente.detalles.push(producto);  // Agrega los detalles de tallas
+      }
+    });
+    return Array.from(productosMap.values());
+  };
+
+  const toggleExpandirProducto = (id) => {
+    setProductosExpandidos(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
 
   const handleModificar = (id) => {
     navigate(`/admin/editar/${id}`);
@@ -67,10 +94,6 @@ const ListarProductos = () => {
       console.error('Error al cambiar estado del producto:', error);
       toast.error('Error al cambiar estado del producto');
     }
-  };
-
-  const handleVerDetalles = (id) => {
-    navigate(`/admin/detalle/${id}`);
   };
 
   // Filtrar productos
@@ -167,14 +190,42 @@ const ListarProductos = () => {
             <div className="producto-info">
               <h3>{producto.nombre_producto}</h3>
               <p className="precio">${producto.precio}</p>
-              <button onClick={() => handleVerDetalles(producto.id_producto)}>Ver Detalles</button>
-              <button onClick={() => handleModificar(producto.id_producto)}>Modificar</button>
-              <button onClick={() => handleCambiarEstado(
-                producto.id_producto,
-                producto.estado === 'activo' ? 'inactivo' : 'activo'
-              )}>
-                {producto.estado === 'activo' ? 'Desactivar' : 'Activar'}
+              <p className="estado">
+                Estado: <span className={producto.estado === 'activo' ? 'activo' : 'inactivo'}>
+                  {producto.estado}
+                </span>
+              </p>
+              
+              <button 
+                onClick={() => toggleExpandirProducto(producto.id_producto)}
+                className="btn-ver-tallas"
+              >
+                {productosExpandidos[producto.id_producto] ? 'Ocultar tallas' : 'Ver tallas'}
               </button>
+              
+              {productosExpandidos[producto.id_producto] && (
+                <div className="tallas-container">
+                  <h4>Tallas disponibles:</h4>
+                  <ul className="lista-tallas">
+                    {producto.detalles && producto.detalles.map((detalle, index) => (
+                      <li key={index}>
+                        <span>Talla: {detalle.nombre_talla}</span> {/* Aquí estamos usando `talla_id` */}
+                        <span>Stock: {detalle.stock}</span> {/* Aquí estamos usando `stock` */}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              <div className="acciones-producto">
+                <button onClick={() => handleModificar(producto.id_producto)}>Modificar</button>
+                <button onClick={() => handleCambiarEstado(
+                  producto.id_producto,
+                  producto.estado === 'activo' ? 'inactivo' : 'activo'
+                )}>
+                  {producto.estado === 'activo' ? 'Desactivar' : 'Activar'}
+                </button>
+              </div>
             </div>
           </div>
         ))}
