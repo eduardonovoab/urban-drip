@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import '../Styles/Register.css';  // Importar el archivo CSS de estilos
+import '../Styles/Register.css';
 
 function validarRut(rutCompleto) {
   rutCompleto = rutCompleto.replace(/\./g, '').replace('-', '');
@@ -30,37 +30,70 @@ const Register = () => {
   const [comunas, setComunas] = useState([]);
 
   const [form, setForm] = useState({
-    nombre: '',
-    apellido: '',
+    nombre_usuario: '',
+    apellido_usuario: '',
     correo: '',
     contrasena: '',
     rol: 'cliente',
     rut: '',
     direccion: '',
-    ciudad: '',
-    region_id: '',
+    region_id_region: '',
     comuna_id: '',
-    estado: 'A',
+    estado_usuario: 'Activo'
   });
 
   useEffect(() => {
     fetch('http://localhost:3000/api/location/regiones')
-      .then((res) => res.json())
-      .then(setRegiones)
-      .catch(() => setRegiones([]));
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`Error ${res.status}: ${res.statusText}`);
+        }
+        return res.json();
+      })
+      .then((data) => {
+        // Verificar que data sea un array
+        if (Array.isArray(data)) {
+          setRegiones(data);
+        } else {
+          console.error('Datos de regiones no válidos:', data);
+          setRegiones([]);
+        }
+      })
+      .catch((error) => {
+        console.error('Error al cargar regiones:', error);
+        setRegiones([]);
+        toast.error('Error al cargar las regiones');
+      });
   }, []);
 
   useEffect(() => {
-    if (form.region_id) {
-      fetch(`http://localhost:3000/api/location/comunas/${form.region_id}`)
-        .then((res) => res.json())
-        .then(setComunas)
-        .catch(() => setComunas([]));
+    if (form.region_id_region) {
+      fetch(`http://localhost:3000/api/location/comunas/${form.region_id_region}`)
+        .then((res) => {
+          if (!res.ok) {
+            throw new Error(`Error ${res.status}: ${res.statusText}`);
+          }
+          return res.json();
+        })
+        .then((data) => {
+          // Verificar que data sea un array
+          if (Array.isArray(data)) {
+            setComunas(data);
+          } else {
+            console.error('Datos de comunas no válidos:', data);
+            setComunas([]);
+          }
+        })
+        .catch((error) => {
+          console.error('Error al cargar comunas:', error);
+          setComunas([]);
+          toast.error('Error al cargar las comunas');
+        });
     } else {
       setComunas([]);
       setForm((f) => ({ ...f, comuna_id: '' }));
     }
-  }, [form.region_id]);
+  }, [form.region_id_region]);
 
   const validateEmail = (email) => {
     const regex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
@@ -87,7 +120,7 @@ const Register = () => {
       toast.error('La contraseña debe tener al menos 8 caracteres');
       return;
     }
-    if (!form.region_id || !form.comuna_id) {
+    if (!form.region_id_region || !form.comuna_id) {
       toast.error('Debes seleccionar región y comuna');
       return;
     }
@@ -96,7 +129,10 @@ const Register = () => {
       const res = await fetch('http://localhost:3000/api/usuario/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          comuna_id_comuna: form.comuna_id
+        }),
       });
       const data = await res.json();
 
@@ -120,17 +156,17 @@ const Register = () => {
         <h2 className="form-title">Registro de Usuario</h2>
 
         <input
-          name="nombre"
+          name="nombre_usuario"
           placeholder="Nombre"
-          value={form.nombre}
+          value={form.nombre_usuario}
           onChange={handleChange}
           required
           className="input-field"
         />
         <input
-          name="apellido"
+          name="apellido_usuario"
           placeholder="Apellido"
-          value={form.apellido}
+          value={form.apellido_usuario}
           onChange={handleChange}
           required
           className="input-field"
@@ -169,24 +205,16 @@ const Register = () => {
           required
           className="input-field"
         />
-        <input
-          name="ciudad"
-          placeholder="Ciudad"
-          value={form.ciudad}
-          onChange={handleChange}
-          required
-          className="input-field"
-        />
 
         <select
-          name="region_id"
-          value={form.region_id}
+          name="region_id_region"
+          value={form.region_id_region}
           onChange={handleChange}
           required
           className="input-field"
         >
           <option value="">Selecciona Región</option>
-          {regiones.map((r) => (
+          {Array.isArray(regiones) && regiones.map((r) => (
             <option key={r.id_region} value={r.id_region}>
               {r.nombre_region}
             </option>
@@ -197,12 +225,12 @@ const Register = () => {
           name="comuna_id"
           value={form.comuna_id}
           onChange={handleChange}
-          disabled={!form.region_id}
+          disabled={!form.region_id_region}
           required
           className="input-field"
         >
           <option value="">Selecciona Comuna</option>
-          {comunas.map((c) => (
+          {Array.isArray(comunas) && comunas.map((c) => (
             <option key={c.id_comuna} value={c.id_comuna}>
               {c.nombre_comuna}
             </option>

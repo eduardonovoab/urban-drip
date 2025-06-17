@@ -1,0 +1,91 @@
+¦   eslint.config.js
+¦   package-lock.json
+¦   package.json
+¦   vite.config.js
+¦   ¦   app.js
+¦   ¦   createUser.js
+¦   ¦   insertTestProduct.js
+¦   ¦   package-lock.json
+¦   ¦   package.json
+¦   ¦   server.js
+¦   ¦   testDB.js
+¦   ¦       db.js
+¦   ¦       adminController.js
+¦   ¦       authController.js
+¦   ¦       clientController.js
+¦   ¦       locationController.js
+¦   ¦       pedidoController.js
+¦   ¦       productoController.js
+¦   ¦       usuarioController.js
+¦   ¦       webpayController.js
+¦   ¦       authMiddleware.js
+¦   ¦       cartModel.js
+¦   ¦       index.js
+¦   ¦       productModel.js
+¦   ¦       userModel.js
+¦   ¦       usuarioModel.js
+
+    ¦   App.css
+    ¦   App.jsx
+    ¦   index.css
+    ¦   main.jsx
+    ¦   tailwind.css
+    ¦       AdminDashboard.jsx
+    ¦       Banner.jsx
+    ¦       CarritoIcon.jsx
+    ¦       Categorias.jsx
+    ¦       DetalleProducto.jsx
+    ¦       Footer.jsx
+    ¦       Marcas.jsx
+    ¦       Navbar.jsx
+    ¦       pagoResultado.jsx
+    ¦       ProductCard.jsx
+    ¦       ProductosDestacados.jsx
+    ¦       ProductosDropdown.jsx
+    ¦       ProductosPorCategoria.jsx
+    ¦       ProductosPorMarca.jsx
+    ¦       Reportes.jsx
+    ¦       AuthContext.jsx
+    ¦       CarritoContext.jsx
+    ¦       Admin.jsx
+    ¦       AdminPanel.jsx
+    ¦       AdminProductList.jsx
+    ¦       AdminProducts.jsx
+    ¦       AdminReportes.jsx
+    ¦       AdminUsuarios.jsx
+    ¦       AgregarProducto.jsx
+    ¦       AgregarTallaProducto.jsx
+    ¦       Carrito.jsx
+    ¦       Cart.jsx
+    ¦       CheckoutPage.jsx
+    ¦       Cliente.jsx
+    ¦       EditarProducto.jsx
+    ¦       Home.jsx
+    ¦       ListarProductos.jsx
+    ¦       Login.jsx
+    ¦       MisPedidos.jsx
+    ¦       NotFound.jsx
+    ¦       PedidoDetalle.jsx
+    ¦       ProductDetail.jsx
+    ¦       ProductosList.jsx
+    ¦       Profile.jsx
+    ¦       Register.jsx
+    ¦       AdminRoutes.jsx
+    ¦       AppRoutes.jsx
+    ¦       ProtectedRoute.jsx
+    ¦       api.js
+            AdminPanel.css
+            AdminUsuarios.css
+            AgregarProducto.css
+            Carrito.css
+            Cart.css
+            CheckoutPage.css
+            DetalleProducto.css
+            EditarProducto.css
+            ListarProductos.css
+            Login.css
+            Navbar.css
+            PaymentResult.css
+            ProductosDestacados.css
+            ProductosPorCategoria.css
+            Register.css

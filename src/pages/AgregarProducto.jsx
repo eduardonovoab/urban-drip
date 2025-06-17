@@ -13,10 +13,9 @@ const AgregarProducto = () => {
     nombre: '',
     descripcion: '',
     imagen_url: '',
-    estado: 'activo',
     categoria_id: '',
-    precio_base: '',
     marca_id: '',
+    precio_base: '',
     tallas: [{ talla_id: '', stock: '' }],
   };
 
@@ -31,8 +30,15 @@ const AgregarProducto = () => {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
-      toast.error('No estás autenticado. Por favor, inicia sesión.');
-      navigate('/login');
+      toast.error('❌ No estás autenticado. Redirigiendo al login...', {
+        position: "top-center",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+      setTimeout(() => navigate('/login'), 2000);
       return;
     }
 
@@ -51,12 +57,46 @@ const AgregarProducto = () => {
           }),
         ]);
         
+        console.log('✅ Datos cargados exitosamente');
+        
         setCategorias(categoriasRes.data);
         setTallas(tallasRes.data);
         setMarcas(marcasRes.data);
+
+        // Notificación de carga exitosa
+        toast.success('📋 Datos cargados correctamente', {
+          position: "top-right",
+          autoClose: 2000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+        
       } catch (error) {
-        console.error('Error al cargar datos:', error);
-        toast.error('Error al cargar categorías, tallas o marcas');
+        console.error('❌ Error al cargar datos:', error);
+        
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          localStorage.removeItem('token');
+          toast.error('🔒 Sesión expirada. Redirigiendo al login...', {
+            position: "top-center",
+            autoClose: 3000,
+            hideProgressBar: false,
+            closeOnClick: true,
+            pauseOnHover: true,
+            draggable: true,
+          });
+          setTimeout(() => navigate('/login'), 2000);
+        } else {
+          toast.error('❌ Error al cargar categorías, tallas o marcas', {
+            position: "top-center",
+            autoClose: 4000,
+            hideProgressBar: false,
+            closeOnClick: true,
+            pauseOnHover: true,
+            draggable: true,
+          });
+        }
       } finally {
         setLoading(false);
       }
@@ -79,7 +119,6 @@ const AgregarProducto = () => {
     const { name, value } = e.target;
     setProducto(prev => ({ ...prev, [name]: value }));
     
-    // Limpiar error del campo
     if (errores[name]) {
       clearError(name);
     }
@@ -100,13 +139,11 @@ const AgregarProducto = () => {
       };
     });
 
-    // Limpiar error del campo específico
     const errorKey = `talla_${index}_${name}`;
     if (errores[errorKey]) {
       clearError(errorKey);
     }
 
-    // Si se cambió la talla, verificar duplicados en tiempo real
     if (name === 'talla_id') {
       validateDuplicateTallas(index, value);
     }
@@ -139,12 +176,28 @@ const AgregarProducto = () => {
         { talla_id: '', stock: '' }
       ]
     }));
+
+    toast.info('➕ Nueva talla agregada', {
+      position: "bottom-right",
+      autoClose: 1500,
+      hideProgressBar: true,
+      closeOnClick: true,
+      pauseOnHover: false,
+      draggable: true,
+    });
   };
 
   // Eliminar talla
   const handleRemoveTalla = (index) => {
     if (producto.tallas.length <= 1) {
-      toast.warning('Debe haber al menos una talla');
+      toast.warning('⚠️ Debe haber al menos una talla', {
+        position: "top-center",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
       return;
     }
     
@@ -163,13 +216,27 @@ const AgregarProducto = () => {
       });
       return nuevosErrores;
     });
+
+    toast.info('🗑️ Talla eliminada', {
+      position: "bottom-right",
+      autoClose: 1500,
+      hideProgressBar: true,
+      closeOnClick: true,
+      pauseOnHover: false,
+      draggable: true,
+    });
   };
 
   // Validación de URL de imagen
   const validateImageUrl = (url) => {
-    if (!url.trim()) return true; // URL opcional
-    const urlRegex = /^(https?:\/\/.*\.(?:png|jpg|jpeg|gif|svg|webp))$/i;
-    return urlRegex.test(url);
+    if (!url.trim()) return true;
+    try {
+      new URL(url);
+      const urlRegex = /^https?:\/\/.*\.(png|jpg|jpeg|gif|svg|webp)(\?.*)?$/i;
+      return urlRegex.test(url);
+    } catch {
+      return false;
+    }
   };
 
   // Validación completa del formulario
@@ -218,18 +285,14 @@ const AgregarProducto = () => {
       }
     });
 
-    // Validar tallas con detección de duplicados mejorada
+    // Validar tallas
     const tallasUsadas = new Set();
-    const tallasVacias = [];
 
     producto.tallas.forEach((talla, index) => {
-      // Validar que se haya seleccionado una talla
       if (!talla.talla_id) {
         nuevosErrores[`talla_${index}_talla_id`] = 'Selecciona una talla';
-        tallasVacias.push(index);
         valido = false;
       } else {
-        // Verificar tallas duplicadas
         if (tallasUsadas.has(talla.talla_id)) {
           nuevosErrores[`talla_${index}_talla_id`] = 'Esta talla ya fue agregada';
           valido = false;
@@ -238,7 +301,6 @@ const AgregarProducto = () => {
         }
       }
       
-      // Validar stock
       const stockValue = Number(talla.stock);
       if (!talla.stock || isNaN(stockValue) || stockValue < 0) {
         nuevosErrores[`talla_${index}_stock`] = 'El stock debe ser un número mayor o igual a 0';
@@ -254,32 +316,65 @@ const AgregarProducto = () => {
   const resetForm = () => {
     setProducto(initialProductState);
     setErrores({});
+    
+    toast.success('🧹 Formulario limpiado correctamente', {
+      position: "bottom-center",
+      autoClose: 2000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+    });
   };
 
-  // Enviar formulario
+  // ENVIAR FORMULARIO - MEJORADO CON NOTIFICACIONES DETALLADAS
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!validarFormulario()) {
-      toast.error('Por favor corrige los errores antes de enviar');
+      toast.error('❌ Por favor corrige los errores antes de enviar', {
+        position: "top-center",
+        autoClose: 4000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+      
+      // Scroll al primer error
+      const firstErrorElement = document.querySelector('.error-text');
+      if (firstErrorElement) {
+        firstErrorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
       return;
     }
 
     const token = localStorage.getItem('token');
     if (!token) {
-      toast.error('No estás autenticado. Por favor, inicia sesión.');
-      navigate('/login');
+      toast.error('🔒 No estás autenticado. Redirigiendo al login...', {
+        position: "top-center",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+      setTimeout(() => navigate('/login'), 2000);
       return;
     }
 
     setLoading(true);
 
+    // Notificación de inicio de guardado
+    const loadingToast = toast.loading('💾 Guardando producto...', {
+      position: "top-center",
+    });
+
     try {
       const payload = {
         nombre: producto.nombre.trim(),
         descripcion: producto.descripcion.trim(),
-        imagen_url: producto.imagen_url.trim(),
-        estado: producto.estado,
+        imagen_url: producto.imagen_url.trim() || '',
         categoria_id: parseInt(producto.categoria_id),
         detalles: producto.tallas.map((talla) => ({
           marca_id: parseInt(producto.marca_id),
@@ -289,29 +384,120 @@ const AgregarProducto = () => {
         })),
       };
 
-      await axios.post(
+      console.log('📤 Enviando payload:', payload);
+
+      const response = await axios.post(
         'http://localhost:3000/api/admin/producto',
         payload,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { 
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          } 
+        }
       );
 
-      toast.success('Producto agregado correctamente');
+      console.log('✅ Respuesta del servidor:', response.data);
+
+      // Actualizar el toast de loading a éxito
+      toast.update(loadingToast, {
+        render: '✅ ¡Producto creado exitosamente!',
+        type: 'success',
+        isLoading: false,
+        position: "top-center",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+
+      // Mostrar información del producto creado
+      toast.success(`🎉 "${producto.nombre}" agregado con ${producto.tallas.length} variante(s)`, {
+        position: "top-right",
+        autoClose: 4000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+
+      // Limpiar formulario
       resetForm();
       
+      // Notificación de redirección
       setTimeout(() => {
-        navigate('/admin/listarproductos');
-      }, 2000);
+        toast.info('📄 Redirigiendo a la lista de productos...', {
+          position: "bottom-center",
+          autoClose: 2000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: false,
+          draggable: true,
+        });
+      }, 1000);
+
+      // Redirigir a la lista de productos
+      setTimeout(() => {
+        navigate('/admin/ListarProductos'); // Cambiado para coincidir con tu ruta
+      }, 3000);
 
     } catch (error) {
-      console.error('Error al agregar el producto:', error);
-      const errorMessage = error.response?.data?.message || 'Error al agregar el producto';
-      toast.error(errorMessage);
+      console.error('❌ Error al agregar el producto:', error);
+      
+      // Actualizar el toast de loading a error
+      toast.update(loadingToast, {
+        render: '❌ Error al guardar el producto',
+        type: 'error',
+        isLoading: false,
+        position: "top-center",
+        autoClose: 4000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+      
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        localStorage.removeItem('token');
+        toast.error('🔒 Sesión expirada. Redirigiendo al login...', {
+          position: "top-center",
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+        setTimeout(() => navigate('/login'), 2000);
+        return;
+      }
+      
+      let errorMessage = 'Error desconocido al agregar el producto';
+      
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = `Error de red: ${error.message}`;
+      }
+      
+      // Mostrar error específico
+      toast.error(`🚨 ${errorMessage}`, {
+        position: "top-center",
+        autoClose: 6000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+
     } finally {
       setLoading(false);
     }
   };
 
-  // Obtener tallas disponibles (excluyendo las ya seleccionadas)
+  // Obtener tallas disponibles
   const getTallasDisponibles = (currentIndex) => {
     const tallasSeleccionadas = producto.tallas
       .map((talla, index) => index !== currentIndex ? talla.talla_id : null)
@@ -323,7 +509,10 @@ const AgregarProducto = () => {
   if (loading) {
     return (
       <div className="agregar-producto-container">
-        <div className="loading-spinner">Cargando...</div>
+        <div className="loading-spinner">
+          <div className="spinner"></div>
+          <p>Cargando datos necesarios...</p>
+        </div>
       </div>
     );
   }
@@ -344,7 +533,7 @@ const AgregarProducto = () => {
               value={producto.nombre}
               onChange={handleChange}
               placeholder="Nombre del producto"
-              maxLength="100"
+              maxLength="50"
             />
             {errores.nombre && <p className="error-text">{errores.nombre}</p>}
           </div>
@@ -357,11 +546,11 @@ const AgregarProducto = () => {
               onChange={handleChange}
               placeholder="Descripción del producto"
               rows="4"
-              maxLength="500"
+              maxLength="100"
             />
             {errores.descripcion && <p className="error-text">{errores.descripcion}</p>}
             <small className="char-counter">
-              {producto.descripcion.length}/500 caracteres
+              {producto.descripcion.length}/100 caracteres
             </small>
           </div>
 
@@ -399,14 +588,6 @@ const AgregarProducto = () => {
 
           <div className="form-row">
             <div className="form-group">
-              <label>Estado</label>
-              <select name="estado" value={producto.estado} onChange={handleChange}>
-                <option value="activo">Activo</option>
-                <option value="inactivo">Inactivo</option>
-              </select>
-            </div>
-
-            <div className="form-group">
               <label>Categoría *</label>
               <select
                 name="categoria_id"
@@ -422,9 +603,7 @@ const AgregarProducto = () => {
               </select>
               {errores.categoria_id && <p className="error-text">{errores.categoria_id}</p>}
             </div>
-          </div>
 
-          <div className="form-row">
             <div className="form-group">
               <label>Marca *</label>
               <select
@@ -435,26 +614,26 @@ const AgregarProducto = () => {
                 <option value="">Selecciona una marca</option>
                 {marcas.map((marca) => (
                   <option key={marca.id_marca} value={marca.id_marca}>
-                    {marca.nombre}
+                    {marca.nombre_marca}
                   </option>
                 ))}
               </select>
               {errores.marca_id && <p className="error-text">{errores.marca_id}</p>}
             </div>
+          </div>
 
-            <div className="form-group">
-              <label>Precio Base *</label>
-              <input
-                type="number"
-                name="precio_base"
-                value={producto.precio_base}
-                onChange={handleChange}
-                placeholder="0.00"
-                min="0"
-                step="0.01"
-              />
-              {errores.precio_base && <p className="error-text">{errores.precio_base}</p>}
-            </div>
+          <div className="form-group">
+            <label>Precio Base *</label>
+            <input
+              type="number"
+              name="precio_base"
+              value={producto.precio_base}
+              onChange={handleChange}
+              placeholder="0.00"
+              min="0"
+              step="0.01"
+            />
+            {errores.precio_base && <p className="error-text">{errores.precio_base}</p>}
           </div>
         </div>
 
@@ -500,13 +679,12 @@ const AgregarProducto = () => {
                       <option value="">Selecciona una talla</option>
                       {getTallasDisponibles(index).map((tallaOption) => (
                         <option key={tallaOption.id_talla} value={tallaOption.id_talla}>
-                          {tallaOption.talla}
+                          {tallaOption.nombre_talla}
                         </option>
                       ))}
-                      {/* Mostrar la talla actual si ya está seleccionada */}
                       {talla.talla_id && !getTallasDisponibles(index).find(t => t.id_talla.toString() === talla.talla_id) && (
                         <option value={talla.talla_id}>
-                          {tallas.find(t => t.id_talla.toString() === talla.talla_id)?.talla || 'Talla seleccionada'}
+                          {tallas.find(t => t.id_talla.toString() === talla.talla_id)?.nombre_talla || 'Talla seleccionada'}
                         </option>
                       )}
                     </select>
@@ -555,16 +733,23 @@ const AgregarProducto = () => {
         </div>
       </form>
       
+      {/* TOASTCONTAINER MEJORADO */}
       <ToastContainer 
-        position="top-center" 
+        position="top-right"
         autoClose={3000}
         hideProgressBar={false}
-        newestOnTop={false}
+        newestOnTop={true}
         closeOnClick
         rtl={false}
         pauseOnFocusLoss
         draggable
         pauseOnHover
+        theme="light"
+        className="custom-toast-container"
+        toastClassName="custom-toast"
+        bodyClassName="custom-toast-body"
+        progressClassName="custom-progress-bar"
+        limit={5} // Máximo 5 toasts visibles al mismo tiempo
       />
     </div>
   );

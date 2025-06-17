@@ -4,7 +4,7 @@ import { login, registerUser, verifyToken } from '../controllers/authController.
 const router = express.Router();
 
 // Ruta para login
-router.post('/', login);
+router.post('/login', login);
 
 // Ruta para registro
 router.post('/register', registerUser);

@@ -1,70 +1,276 @@
+/* AdminUsuarios.css */
+
 .admin-usuarios-container {
-  max-width: 900px;
-  margin: 2rem auto;
-  padding: 0 1rem;
-  font-family: 'Montserrat', sans-serif;
-  color: rgba(0, 0, 0, 0.87);
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  background-color: #f8f9fa;
+  min-height: 100vh;
 }
 
-h2 {
-  text-align: center;
-  margin-bottom: 1.5rem;
-}
-
-.usuarios-lista {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.usuario-item {
+.header-section {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #f8f8f8;
-  padding: 1rem 1.5rem;
-  border-radius: 8px;
-  box-shadow: 0 0 5px rgb(0 0 0 / 0.1);
+  margin-bottom: 30px;
+  padding: 20px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.usuario-info {
+.header-section h2 {
+  color: #2c3e50;
+  margin: 0;
+  font-size: 2.2rem;
+  font-weight: 600;
+}
+
+.btn-refresh {
+  background: linear-gradient(135deg, #3498db, #2980b9);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
   display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-refresh:hover {
+  background: linear-gradient(135deg, #2980b9, #21618c);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+}
+
+.loading {
+  text-align: center;
+  padding: 50px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.usuarios-lista {
+  background: white;
+  border-radius: 12px;
+  padding: 25px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.usuarios-stats {
+  background: linear-gradient(135deg, #ecf0f1, #bdc3c7);
+  padding: 15px 20px;
+  border-radius: 8px;
+  margin-bottom: 25px;
+  border-left: 4px solid #3498db;
+}
+
+.usuarios-stats p {
+  margin: 5px 0;
+  color: #2c3e50;
+  font-weight: 500;
+}
+
+.usuarios-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 20px;
+}
+
+.usuario-card {
+  background: white;
+  border: 1px solid #e1e8ed;
+  border-radius: 12px;
+  padding: 20px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.usuario-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  border-color: #3498db;
+}
+
+.usuario-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #ecf0f1;
 }
 
 .usuario-nombre {
-  font-weight: 700;
-  font-size: 1.1rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #2c3e50;
 }
 
-.usuario-rol,
-.usuario-correo,
+.usuario-status {
+  font-size: 1.2rem;
+}
+
+.usuario-details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.usuario-details > div {
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #f8f9fa;
+}
+
+.usuario-correo {
+  color: #7f8c8d;
+  font-size: 14px;
+}
+
+.usuario-rol {
+  color: #34495e;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.rol-badge {
+  background: #3498db;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.rol-badge.rol-admin {
+  background: #e74c3c;
+}
+
+.rol-badge.rol-cliente {
+  background: #27ae60;
+}
+
+.usuario-id {
+  color: #95a5a6;
+  font-size: 12px;
+}
+
 .usuario-estado {
-  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 6px;
+  text-align: center;
+  text-transform: uppercase;
+  font-size: 12px;
 }
 
-.usuario-estado.activo {
-  color: green;
-  font-weight: 600;
+.estado-activo {
+  background: #d5f4e6;
+  color: #27ae60;
 }
 
-.usuario-estado.inactivo {
-  color: red;
-  font-weight: 600;
+.estado-inactivo {
+  background: #fadbd8;
+  color: #e74c3c;
+}
+
+.usuario-actions {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
 }
 
 .btn-estado {
-  padding: 0.5rem 1rem;
-  background-color: #646cff;
+  padding: 10px 20px;
   border: none;
-  color: white;
-  font-weight: 600;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: background-color 0.25s ease;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  min-width: 120px;
 }
 
-.btn-estado:hover {
-  background-color: #535bf2;
+.btn-activar {
+  background: linear-gradient(135deg, #27ae60, #229954);
+  color: white;
+}
+
+.btn-activar:hover {
+  background: linear-gradient(135deg, #229954, #1e8449);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(39, 174, 96, 0.3);
+}
+
+.btn-desactivar {
+  background: linear-gradient(135deg, #e74c3c, #c0392b);
+  color: white;
+}
+
+.btn-desactivar:hover {
+  background: linear-gradient(135deg, #c0392b, #a93226);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
+}
+
+.btn-estado:disabled {
+  background: #bdc3c7;
+  color: #7f8c8d;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.no-usuarios {
+  text-align: center;
+  padding: 60px 20px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.no-usuarios p {
+  font-size: 1.2rem;
+  color: #7f8c8d;
+  margin-bottom: 20px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .admin-usuarios-container {
+    padding: 10px;
+  }
+  
+  .header-section {
+    flex-direction: column;
+    gap: 15px;
+    text-align: center;
+  }
+  
+  .usuarios-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .usuario-header {
+    flex-direction: column;
+    gap: 10px;
+    text-align: center;
+  }
+}
+
+/* Toast customization */
+.Toastify__toast--success {
+  background: linear-gradient(135deg, #27ae60, #229954);
+}
+
+.Toastify__toast--error {
+  background: linear-gradient(135deg, #e74c3c, #c0392b);
 }

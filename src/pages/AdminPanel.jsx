@@ -9,19 +9,34 @@ const AdminPanel = () => {
       <nav className="admin-nav">
         <ul className="admin-nav-list">
           <li className="admin-nav-item">
-            <Link to="/admin/Reportes" className="admin-nav-link">Generar Reportes</Link>
+            <Link to="/admin/Reportes" className="admin-nav-link">
+              <span className="nav-icon">📊</span>
+              Generar Reportes
+            </Link>
           </li>
           <li className="admin-nav-item">
-            <Link to="/admin/ListarProductos" className="admin-nav-link">Listar Productos</Link>
+            <Link to="/admin/ListarProductos" className="admin-nav-link">
+              <span className="nav-icon">📦</span>
+              Listar Productos
+            </Link>
           </li>
           <li className="admin-nav-item">
-            <Link to="/admin/AgregarProducto" className="admin-nav-link">Agregar Producto</Link>
+            <Link to="/admin/AgregarProducto" className="admin-nav-link">
+              <span className="nav-icon">➕</span>
+              Agregar Producto
+            </Link>
           </li>
           <li className="admin-nav-item">
-            <Link to="/admin/agregar-talla/:id_producto" className="admin-nav-link">Agregar Talla</Link> {/* Aquí agregamos la opción */}
+            <Link to="/admin/AdminUsuarios" className="admin-nav-link">
+              <span className="nav-icon">👥</span>
+              Listar Usuarios
+            </Link>
           </li>
           <li className="admin-nav-item">
-            <Link to="/admin/AdminUsuarios" className="admin-nav-link">Listar Usuarios</Link>
+            <Link to="/admin/GestionarPedidos" className="admin-nav-link">
+              <span className="nav-icon">🛒</span>
+              Gestionar Pedidos
+            </Link>
           </li>
         </ul>
       </nav>

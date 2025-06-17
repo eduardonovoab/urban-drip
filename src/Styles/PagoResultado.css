@@ -1,0 +1,368 @@
+/* styles/PagoResultado.css */
+
+.pago-resultado-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  font-family: 'Arial', sans-serif;
+}
+
+.pago-resultado-content {
+  background: white;
+  border-radius: 15px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  max-width: 600px;
+  width: 100%;
+  padding: 40px;
+  text-align: center;
+}
+
+/* Estados específicos */
+.resultado-procesando,
+.resultado-exitoso,
+.resultado-fallido,
+.resultado-error {
+  margin-bottom: 30px;
+}
+
+/* Iconos */
+.icono-exito,
+.icono-error {
+  font-size: 4rem;
+  margin-bottom: 20px;
+  display: block;
+}
+
+.icono-exito {
+  color: #28a745;
+}
+
+.icono-error {
+  color: #dc3545;
+}
+
+/* Loading spinner */
+.loading-spinner-large {
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #007bff;
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 20px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Títulos */
+h1 {
+  color: #333;
+  margin-bottom: 15px;
+  font-size: 2.5rem;
+  font-weight: bold;
+}
+
+h2 {
+  color: #555;
+  margin-bottom: 15px;
+  font-size: 2rem;
+}
+
+h3 {
+  color: #666;
+  margin-bottom: 15px;
+  font-size: 1.3rem;
+  border-bottom: 2px solid #eee;
+  padding-bottom: 10px;
+}
+
+/* Mensajes */
+.mensaje-exito {
+  color: #28a745;
+  font-size: 1.2rem;
+  margin-bottom: 30px;
+}
+
+.mensaje-error {
+  color: #dc3545;
+  font-size: 1.2rem;
+  margin-bottom: 30px;
+}
+
+/* Detalles de transacción */
+.detalles-transaccion {
+  background: #f8f9fa;
+  border-radius: 10px;
+  padding: 25px;
+  margin: 30px 0;
+  text-align: left;
+}
+
+.detalle-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.detalle-item:last-child {
+  border-bottom: none;
+}
+
+.detalle-label {
+  font-weight: 600;
+  color: #495057;
+  flex: 1;
+}
+
+.detalle-valor {
+  font-weight: 500;
+  color: #212529;
+  text-align: right;
+  flex: 1;
+}
+
+/* Resumen de compra */
+.resumen-compra {
+  background: #e9ecef;
+  border-radius: 10px;
+  padding: 25px;
+  margin: 30px 0;
+  text-align: left;
+}
+
+.productos-comprados {
+  margin: 20px 0;
+}
+
+.producto-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #ced4da;
+}
+
+.producto-item:last-child {
+  border-bottom: none;
+}
+
+.producto-nombre {
+  flex: 2;
+  font-weight: 500;
+}
+
+.producto-cantidad {
+  flex: 1;
+  text-align: center;
+  color: #6c757d;
+}
+
+.producto-precio {
+  flex: 1;
+  text-align: right;
+  font-weight: 600;
+}
+
+.total-compra {
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 2px solid #adb5bd;
+  font-size: 1.2rem;
+  text-align: right;
+}
+
+/* Detalles de error */
+.detalle-error {
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 8px;
+  padding: 20px;
+  margin: 20px 0;
+  color: #721c24;
+}
+
+/* Botones */
+.acciones-exito,
+.acciones-fallido,
+.acciones-error {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  margin-top: 30px;
+  flex-wrap: wrap;
+}
+
+.btn-primary,
+.btn-secondary {
+  padding: 12px 30px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  display: inline-block;
+  min-width: 150px;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #007bff, #0056b3);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #0056b3, #004085);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 123, 255, 0.3);
+}
+
+.btn-secondary {
+  background: #6c757d;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #545b62;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(108, 117, 125, 0.3);
+}
+
+/* Información de soporte */
+.informacion-soporte {
+  margin-top: 40px;
+  padding: 20px;
+  background: #d1ecf1;
+  border: 1px solid #bee5eb;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: #0c5460;
+}
+
+.informacion-soporte a {
+  color: #007bff;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.informacion-soporte a:hover {
+  text-decoration: underline;
+}
+
+/* Debug info */
+.debug-info {
+  margin-top: 30px;
+  padding: 15px;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 5px;
+  font-size: 12px;
+  text-align: left;
+}
+
+.debug-info h4 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #495057;
+}
+
+.debug-info details {
+  margin-top: 10px;
+}
+
+.debug-info summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #007bff;
+}
+
+.debug-info pre {
+  background: #343a40;
+  color: #f8f9fa;
+  padding: 10px;
+  border-radius: 4px;
+  overflow-x: auto;
+  font-size: 11px;
+  margin-top: 5px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .pago-resultado-container {
+    padding: 15px;
+  }
+
+  .pago-resultado-content {
+    padding: 25px;
+  }
+
+  h1 {
+    font-size: 2rem;
+  }
+
+  h2 {
+    font-size: 1.5rem;
+  }
+
+  .acciones-exito,
+  .acciones-fallido,
+  .acciones-error {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .btn-primary,
+  .btn-secondary {
+    width: 100%;
+    max-width: 250px;
+  }
+
+  .detalle-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+
+  .detalle-valor {
+    text-align: left;
+  }
+
+  .producto-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+
+  .producto-cantidad,
+  .producto-precio {
+    text-align: left;
+  }
+}
+
+@media (max-width: 480px) {
+  .pago-resultado-content {
+    padding: 20px;
+  }
+
+  h1 {
+    font-size: 1.8rem;
+  }
+
+  .icono-exito,
+  .icono-error {
+    font-size: 3rem;
+  }
+
+  .loading-spinner-large {
+    width: 50px;
+    height: 50px;
+  }
+}

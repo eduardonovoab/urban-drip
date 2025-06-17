@@ -1,0 +1,22 @@
+/* CheckoutPage.css */
+
+h1 {
+  text-align: center;
+  margin-top: 50px;
+}
+
+button {
+  display: block;
+  margin: 0 auto;
+  padding: 10px 20px;
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #45a049;
+}

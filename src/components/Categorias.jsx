@@ -5,18 +5,17 @@ const Categorias = () => {
   const [categorias, setCategorias] = useState([]);
 
   useEffect(() => {
-    fetch('http://localhost:3000/api/categorias')
+    fetch('http://localhost:3000/api/productos/categorias')
       .then(res => res.json())
       .then(data => setCategorias(data))
       .catch(err => console.error('Error al cargar categorías:', err));
   }, []);
 
   const categoriaImagenes = {
-    'Poleras': 'https://dojiw2m9tvv09.cloudfront.net/77327/1/dsc088169991.jpg?24&time=1747953932',
-    'Polerones': 'https://dojiw2m9tvv09.cloudfront.net/77327/1/dsc067993420.jpg?24&time=1747953932',
-    'Pantalones': 'https://catcl.vtexassets.com/arquivos/ids/526939/4070031_2JU_1.jpg?v=638442098146330000?width=1200&height=auto',
-    'Shorts': 'https://nikeclprod.vtexassets.com/arquivos/ids/724300-800-800?v=638241059659430000&width=800&height=800&aspect=true',
-    'Casacas': 'https://dojiw2m9tvv09.cloudfront.net/77327/1/copiadedsc071799865.jpg?24&time=1747953932',
+    'POLERAS': 'https://dojiw2m9tvv09.cloudfront.net/77327/1/dsc088169991.jpg?24&time=1747953932',
+    'POLERONES': 'https://dojiw2m9tvv09.cloudfront.net/77327/1/dsc067993420.jpg?24&time=1747953932',
+    'PANTALONES': 'https://catcl.vtexassets.com/arquivos/ids/526939/4070031_2JU_1.jpg?v=638442098146330000?width=1200&height=auto',
+    'CHAQUETAS': 'https://dojiw2m9tvv09.cloudfront.net/77327/1/copiadedsc071799865.jpg?24&time=1747953932',
   };
 
   return (

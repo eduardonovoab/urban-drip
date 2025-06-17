@@ -5,14 +5,14 @@ const Marcas = () => {
   const [marcas, setMarcas] = useState([]);
 
   useEffect(() => {
-    fetch('http://localhost:3000/api/marcas')
+    fetch('http://localhost:3000/api/productos/marcas')
       .then(res => res.json())
       .then(data => setMarcas(data))
       .catch(err => console.error('Error al cargar marcas:', err));
   }, []);
 
   const marcaLogos = {
-    "DcSHOES": "/logos/DcSHOES.jpg",
+    "DC": "/logos/DcSHOES.jpg",
     "DIAMOND": "/logos/DIAMOND.jpg",
     "ESSENTIALS": "/logos/ESSENTIALS.png",
     "HUF": "/logos/HUF.webp",
@@ -67,7 +67,7 @@ const Marcas = () => {
 
       <div className="grid-marcas">
         {marcas.map((marca) => {
-          const logoUrl = marcaLogos[marca.nombre] || "/logos/default-logo.png";
+          const logoUrl = marcaLogos[marca.nombre_marca] || "/logos/default-logo.png";
           return (
             <Link
               key={marca.id_marca}
