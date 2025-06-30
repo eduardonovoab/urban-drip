@@ -1,7 +1,8 @@
-// pages/Cliente.jsx - VERSIÓN MEJORADA CON HISTORIAL DETALLADO
+// pages/Cliente.jsx - VERSIÓN CON GENERACIÓN DE BOLETA
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
+import jsPDF from 'jspdf';
 import '../Styles/Cliente.css';
 
 const Cliente = () => {
@@ -13,6 +14,7 @@ const Cliente = () => {
   const [mostrarDetalle, setMostrarDetalle] = useState(null);
   const [detallePedido, setDetallePedido] = useState(null);
   const [loadingDetalle, setLoadingDetalle] = useState(false);
+  const [generandoBoleta, setGenerandoBoleta] = useState(null);
   
   const [usuario, setUsuario] = useState({
     id_usuario: '',
@@ -67,6 +69,231 @@ const Cliente = () => {
         toast.error('Sesión expirada. Por favor inicia sesión nuevamente.');
       }
       throw error;
+    }
+  };
+
+  // Función para generar y descargar la boleta
+  const generarBoleta = async (pedidoId) => {
+    try {
+      setGenerandoBoleta(pedidoId);
+      
+      // Cargar los detalles del pedido si no están disponibles
+      let datosPedido = detallePedido;
+      if (mostrarDetalle !== pedidoId || !detallePedido) {
+        const data = await authenticatedRequest(
+          `http://localhost:3000/api/client/pedidos/${pedidoId}`,
+          'GET'
+        );
+        
+        if (!data.success) {
+          toast.error('Error al cargar los datos del pedido');
+          return;
+        }
+        datosPedido = data.pedido;
+      }
+
+      // Crear el PDF
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.width;
+      let currentY = 20;
+
+      // Configurar fuentes
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(20);
+      
+      // Encabezado
+      doc.setTextColor(44, 62, 80);
+      doc.text('URBANDRIP', pageWidth / 2, currentY, { align: 'center' });
+      currentY += 10;
+      
+      doc.setFontSize(16);
+      doc.text('BOLETA ELECTRÓNICA', pageWidth / 2, currentY, { align: 'center' });
+      currentY += 15;
+
+      // Información de la empresa
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text('UrbanDrip SpA', pageWidth / 2, currentY, { align: 'center' });
+      currentY += 5;
+      doc.text('RUT: 76.XXX.XXX-X', pageWidth / 2, currentY, { align: 'center' });
+      currentY += 5;
+      doc.text('Dirección: Santiago, Chile', pageWidth / 2, currentY, { align: 'center' });
+      currentY += 15;
+
+      // Línea separadora
+      doc.setLineWidth(0.5);
+      doc.line(20, currentY, pageWidth - 20, currentY);
+      currentY += 10;
+
+      // Información del pedido
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.setTextColor(44, 62, 80);
+      doc.text('INFORMACIÓN DEL PEDIDO', 20, currentY);
+      currentY += 10;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      
+      // Datos del pedido en dos columnas
+      const leftColumn = 20;
+      const rightColumn = pageWidth / 2 + 10;
+      
+      doc.text(`Número de Pedido: #${datosPedido.id_pedido}`, leftColumn, currentY);
+      doc.text(`Fecha: ${formatearFecha(datosPedido.fecha_pedido)}`, rightColumn, currentY);
+      currentY += 7;
+      
+      doc.text(`Estado: ${datosPedido.seguimiento[datosPedido.seguimiento.length - 1]?.nombre_estado || 'N/A'}`, leftColumn, currentY);
+      if (datosPedido.venta) {
+        doc.text(`Método de Pago: ${datosPedido.venta.metodo_pago}`, rightColumn, currentY);
+      }
+      currentY += 15;
+
+      // Información del cliente
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text('DATOS DEL CLIENTE', 20, currentY);
+      currentY += 10;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.text(`Cliente: ${datosPedido.nombre_usuario} ${datosPedido.apellido_usuario}`, leftColumn, currentY);
+      doc.text(`RUT: ${usuario.rut}`, rightColumn, currentY);
+      currentY += 7;
+      
+      doc.text(`Dirección: ${datosPedido.direccion}`, leftColumn, currentY);
+      currentY += 7;
+      doc.text(`Comuna: ${datosPedido.nombre_comuna}, ${datosPedido.nombre_region}`, leftColumn, currentY);
+      currentY += 15;
+
+      // Línea separadora
+      doc.line(20, currentY, pageWidth - 20, currentY);
+      currentY += 10;
+
+      // Detalles de productos
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text('DETALLE DE PRODUCTOS', 20, currentY);
+      currentY += 10;
+
+      // Encabezado de tabla
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.text('PRODUCTO', 20, currentY);
+      doc.text('MARCA/TALLA', 85, currentY);
+      doc.text('CANT.', 130, currentY);
+      doc.text('PRECIO UNIT.', 150, currentY);
+      doc.text('TOTAL', 180, currentY);
+      currentY += 5;
+      
+      // Línea bajo encabezado
+      doc.setLineWidth(0.3);
+      doc.line(20, currentY, pageWidth - 20, currentY);
+      currentY += 8;
+
+      // Productos
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      
+      datosPedido.productos.forEach((producto) => {
+        // Verificar si necesitamos una nueva página
+        if (currentY > 250) {
+          doc.addPage();
+          currentY = 20;
+        }
+        
+        const nombreProducto = doc.splitTextToSize(producto.nombre_producto, 60);
+        const marcaTalla = `${producto.nombre_marca} - ${producto.nombre_talla}`;
+        const cantidad = producto.cantidad.toString();
+        const precioUnit = formatearPrecio(producto.precio);
+        const total = formatearPrecio(producto.subtotal);
+        
+        doc.text(nombreProducto, 20, currentY);
+        doc.text(marcaTalla, 85, currentY);
+        doc.text(cantidad, 135, currentY, { align: 'center' });
+        doc.text(precioUnit, 165, currentY, { align: 'right' });
+        doc.text(total, 195, currentY, { align: 'right' });
+        
+        currentY += Math.max(7, nombreProducto.length * 4);
+      });
+
+      currentY += 5;
+      
+      // Línea antes de totales
+      doc.setLineWidth(0.5);
+      doc.line(130, currentY, pageWidth - 20, currentY);
+      currentY += 10;
+
+      // Cálculos correctos para Chile (precios incluyen IVA)
+      const totalConIva = parseFloat(datosPedido.total);
+      const subtotalSinIva = totalConIva / 1.19; // Precio sin IVA
+      const ivaCalculado = totalConIva - subtotalSinIva; // IVA = Total - Subtotal
+      
+      // Totales
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      
+      doc.text('SUBTOTAL:', 150, currentY);
+      doc.text(formatearPrecio(subtotalSinIva), 195, currentY, { align: 'right' });
+      currentY += 8;
+      
+      doc.text('IVA (19%):', 150, currentY);
+      doc.text(formatearPrecio(ivaCalculado), 195, currentY, { align: 'right' });
+      currentY += 8;
+      
+      // Línea antes del total
+      doc.setLineWidth(0.8);
+      doc.line(130, currentY, pageWidth - 20, currentY);
+      currentY += 8;
+      
+      doc.setFontSize(14);
+      doc.setTextColor(220, 53, 69);
+      doc.text('TOTAL:', 150, currentY);
+      doc.text(formatearPrecio(datosPedido.total), 195, currentY, { align: 'right' });
+      currentY += 15;
+
+      // Información adicional
+      if (currentY > 250) {
+        doc.addPage();
+        currentY = 20;
+      }
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      
+      doc.text('INFORMACIÓN ADICIONAL:', 20, currentY);
+      currentY += 8;
+      doc.text('• Esta boleta fue generada electrónicamente.', 20, currentY);
+      currentY += 5;
+      doc.text('• Para consultas, contáctanos a soporte@urbandrip.cl', 20, currentY);
+      currentY += 5;
+      doc.text('• Conserve este documento como comprobante de compra.', 20, currentY);
+      currentY += 10;
+
+      // Pie de página
+      const fechaGeneracion = new Date().toLocaleDateString('es-CL', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      
+      doc.text(`Documento generado el ${fechaGeneracion}`, pageWidth / 2, currentY, { align: 'center' });
+
+      // Descargar el PDF
+      const nombreArchivo = `Boleta_UrbanDrip_${datosPedido.id_pedido}_${new Date().getTime()}.pdf`;
+      doc.save(nombreArchivo);
+      
+      toast.success('Boleta descargada exitosamente');
+      
+    } catch (error) {
+      console.error('Error al generar la boleta:', error);
+      toast.error('Error al generar la boleta. Intenta nuevamente.');
+    } finally {
+      setGenerandoBoleta(null);
     }
   };
 
@@ -584,6 +811,23 @@ const Cliente = () => {
                     disabled={loadingDetalle}
                   >
                     {loadingDetalle && mostrarDetalle === pedido.id_pedido ? 'Cargando...' : 'Ver Detalle'}
+                  </button>
+                  
+                  <button 
+                    className="btn-boleta"
+                    onClick={() => generarBoleta(pedido.id_pedido)}
+                    disabled={generandoBoleta === pedido.id_pedido}
+                  >
+                    {generandoBoleta === pedido.id_pedido ? (
+                      <>
+                        <span className="loading-spinner-btn"></span>
+                        Generando...
+                      </>
+                    ) : (
+                      <>
+                        📄 Descargar Boleta
+                      </>
+                    )}
                   </button>
                 </div>
 

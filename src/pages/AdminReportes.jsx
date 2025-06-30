@@ -1,361 +1,598 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, 
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
-} from 'recharts';
-import { 
-  TrendingUp, Package, Users, ShoppingCart, AlertTriangle, 
-  Calendar, RefreshCw, DollarSign, Eye,
-  ArrowUp, ArrowDown, Minus, CheckCircle, Clock, XCircle,
-  Settings, Mail, FileText
-} from 'lucide-react';
+"use client"
+
+import { useState, useEffect } from "react"
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts"
+import {
+  TrendingUp,
+  Package,
+  Users,
+  ShoppingCart,
+  AlertTriangle,
+  Calendar,
+  RefreshCw,
+  DollarSign,
+  Eye,
+  ArrowUp,
+  ArrowDown,
+  Minus,
+  CheckCircle,
+  Clock,
+  XCircle,
+  Settings,
+  Mail,
+  FileText,
+  Download,
+  Filter,
+} from "lucide-react"
+import "../styles/dashboard.css"
+import jsPDF from "jspdf"
+import html2canvas from "html2canvas"
 
 const AdminReportes = () => {
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState("dashboard")
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
   const [filters, setFilters] = useState({
-    fechaInicio: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    fechaFin: new Date().toISOString().split('T')[0],
-    periodo: 'mes',
-    limite: 10
-  });
+    fechaInicio: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+    fechaFin: new Date().toISOString().split("T")[0],
+    periodo: "mes",
+    limite: 10,
+  })
 
   // Estados para cada tipo de reporte
-  const [dashboardData, setDashboardData] = useState(null);
-  const [ventasData, setVentasData] = useState(null);
-  const [productosData, setProductosData] = useState(null);
-  const [inventarioData, setInventarioData] = useState(null);
-  const [clientesData, setClientesData] = useState(null);
-  const [pedidosData, setPedidosData] = useState(null);
-  const [categoriasData, setCategoriasData] = useState(null);
+  const [dashboardData, setDashboardData] = useState(null)
+  const [ventasData, setVentasData] = useState(null)
+  const [productosData, setProductosData] = useState(null)
+  const [inventarioData, setInventarioData] = useState(null)
+  const [clientesData, setClientesData] = useState(null)
+  const [pedidosData, setPedidosData] = useState(null)
+  const [categoriasData, setCategoriasData] = useState(null)
 
   // Función para formatear dinero chileno
   const formatCLP = (amount) => {
-    if (amount === null || amount === undefined || isNaN(amount)) return '$0';
-    
-    // Convertir a número si es string
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    
-    // Formatear sin decimales (pesos chilenos no usan decimales)
-    return new Intl.NumberFormat('es-CL', {
-      style: 'currency',
-      currency: 'CLP',
+    if (amount === null || amount === undefined || isNaN(amount)) return "$0"
+    const num = typeof amount === "string" ? Number.parseFloat(amount) : amount
+    return new Intl.NumberFormat("es-CL", {
+      style: "currency",
+      currency: "CLP",
       minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(Math.round(num));
-  };
+      maximumFractionDigits: 0,
+    }).format(Math.round(num))
+  }
 
-  // Función para formatear números grandes de manera más legible
   const formatCLPCompact = (amount) => {
-    if (amount === null || amount === undefined || isNaN(amount)) return '$0';
-    
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    
+    if (amount === null || amount === undefined || isNaN(amount)) return "$0"
+    const num = typeof amount === "string" ? Number.parseFloat(amount) : amount
     if (num >= 1000000000) {
-      return `$${(num / 1000000000).toFixed(1)}MM`;
+      return `$${(num / 1000000000).toFixed(1)}MM`
     } else if (num >= 1000000) {
-      return `$${(num / 1000000).toFixed(1)}M`;
+      return `$${(num / 1000000).toFixed(1)}M`
     } else if (num >= 1000) {
-      return `$${(num / 1000).toFixed(0)}K`;
+      return `$${(num / 1000).toFixed(0)}K`
     }
-    
-    return formatCLP(num);
-  };
+    return formatCLP(num)
+  }
 
-  // Colores para los gráficos
-  const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4'];
+  const COLORS = ["#667eea", "#764ba2", "#f093fb", "#f5576c", "#43e97b", "#38f9d7", "#fa709a", "#fee140"]
 
-  const API_BASE = 'http://localhost:3000/api/reportes';
+  const API_BASE = "http://localhost:3000/api/reportes"
 
-  // Función para verificar la conexión
   const testConnection = async () => {
     try {
-      const response = await fetch(`${API_BASE}/health`);
-      const data = await response.json();
-      console.log('✅ Conexión exitosa:', data);
-      return true;
+      const response = await fetch(`${API_BASE}/health`)
+      const data = await response.json()
+      console.log("✅ Conexión exitosa:", data)
+      return true
     } catch (error) {
-      console.error('❌ Error de conexión:', error);
-      return false;
+      console.error("❌ Error de conexión:", error)
+      return false
     }
-  };
+  }
 
-  // Función genérica para hacer peticiones
   const fetchData = async (endpoint, params = {}) => {
     try {
-      setLoading(true);
-      setError('');
-      
-      const queryParams = new URLSearchParams({ ...filters, ...params });
-      const response = await fetch(`${API_BASE}${endpoint}?${queryParams}`);
-      
+      setLoading(true)
+      setError("")
+      const queryParams = new URLSearchParams({ ...filters, ...params })
+      const response = await fetch(`${API_BASE}${endpoint}?${queryParams}`)
       if (!response.ok) {
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
+        throw new Error(`Error ${response.status}: ${response.statusText}`)
       }
-      
-      const data = await response.json();
-      return data;
+      const data = await response.json()
+      return data
     } catch (err) {
-      setError(err.message);
-      console.error('Error fetching data:', err);
-      return null;
+      setError(err.message)
+      console.error("Error fetching data:", err)
+      return null
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
-  // Cargar datos del dashboard
   const loadDashboard = async () => {
-    const data = await fetchData('/dashboard');
-    if (data) setDashboardData(data);
-  };
+    const data = await fetchData("/dashboard")
+    if (data) setDashboardData(data)
+  }
 
-  // Cargar datos de ventas
   const loadVentas = async () => {
-    const data = await fetchData('/ventas');
-    if (data) setVentasData(data);
-  };
+    const data = await fetchData("/ventas")
+    if (data) setVentasData(data)
+  }
 
-  // Cargar productos más vendidos
   const loadProductos = async () => {
-    const data = await fetchData('/productos-vendidos');
-    if (data) setProductosData(data);
-  };
+    const data = await fetchData("/productos-vendidos")
+    if (data) setProductosData(data)
+  }
 
-  // Cargar inventario
   const loadInventario = async () => {
-    const data = await fetchData('/inventario');
-    if (data) setInventarioData(data);
-  };
+    const data = await fetchData("/inventario")
+    if (data) setInventarioData(data)
+  }
 
-  // Cargar análisis de clientes
   const loadClientes = async () => {
-    const data = await fetchData('/clientes');
-    if (data) setClientesData(data);
-  };
+    const data = await fetchData("/clientes")
+    if (data) setClientesData(data)
+  }
 
-  // Cargar estado de pedidos
   const loadPedidos = async () => {
-    const data = await fetchData('/pedidos');
-    if (data) setPedidosData(data);
-  };
+    const data = await fetchData("/pedidos")
+    if (data) setPedidosData(data)
+  }
 
-  // Cargar rendimiento de categorías
   const loadCategorias = async () => {
-    const data = await fetchData('/categorias');
-    if (data) setCategoriasData(data);
-  };
+    const data = await fetchData("/categorias")
+    if (data) setCategoriasData(data)
+  }
 
-  // Cargar datos según la pestaña activa
-  useEffect(() => {
-    // Primero verificar conexión
-    testConnection().then(connected => {
-      if (!connected) {
-        setError('No se puede conectar con el servidor. Verifica que esté corriendo en puerto 3000.');
-        return;
+  // Función para exportar a PDF
+  const exportToPDF = async () => {
+    try {
+      setLoading(true)
+
+      // Crear un elemento temporal con el contenido a exportar
+      const exportElement = document.createElement("div")
+      exportElement.style.position = "absolute"
+      exportElement.style.left = "-9999px"
+      exportElement.style.top = "0"
+      exportElement.style.width = "1200px"
+      exportElement.style.backgroundColor = "white"
+      exportElement.style.padding = "40px"
+      exportElement.style.fontFamily = "Inter, sans-serif"
+
+      // Crear el contenido del PDF
+      const currentDate = new Date().toLocaleDateString("es-CL", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+
+      let htmlContent = `
+        <div style="margin-bottom: 40px; text-align: center; border-bottom: 3px solid #667eea; padding-bottom: 20px;">
+          <h1 style="color: #1a202c; font-size: 32px; margin-bottom: 10px; font-weight: 800;">
+            Reporte de ${tabs.find((tab) => tab.id === activeTab)?.name || "Dashboard"}
+          </h1>
+          <p style="color: #718096; font-size: 16px; margin: 0;">
+            Generado el ${currentDate} | Período: ${filters.fechaInicio} - ${filters.fechaFin}
+          </p>
+        </div>
+      `
+
+      // Añadir métricas según la pestaña activa
+      if (activeTab === "dashboard" && dashboardData?.metricas) {
+        htmlContent += `
+          <div style="margin-bottom: 40px;">
+            <h2 style="color: #1a202c; font-size: 24px; margin-bottom: 20px; font-weight: 700;">Métricas Principales</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+              <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #667eea;">
+                <h3 style="color: #4a5568; font-size: 12px; text-transform: uppercase; margin-bottom: 8px;">Ventas del Mes</h3>
+                <p style="color: #1a202c; font-size: 24px; font-weight: 800; margin: 0;">${dashboardData.metricas.ventas_mes?.toLocaleString("es-CL") || 0}</p>
+              </div>
+              <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #38a169;">
+                <h3 style="color: #4a5568; font-size: 12px; text-transform: uppercase; margin-bottom: 8px;">Ingresos del Mes</h3>
+                <p style="color: #1a202c; font-size: 24px; font-weight: 800; margin: 0;">${formatCLP(dashboardData.metricas.ingresos_mes)}</p>
+              </div>
+              <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #805ad5;">
+                <h3 style="color: #4a5568; font-size: 12px; text-transform: uppercase; margin-bottom: 8px;">Clientes Activos</h3>
+                <p style="color: #1a202c; font-size: 24px; font-weight: 800; margin: 0;">${dashboardData.metricas.clientes_activos?.toLocaleString("es-CL") || 0}</p>
+              </div>
+              <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #ed8936;">
+                <h3 style="color: #4a5568; font-size: 12px; text-transform: uppercase; margin-bottom: 8px;">Stock Bajo</h3>
+                <p style="color: #1a202c; font-size: 24px; font-weight: 800; margin: 0;">${dashboardData.metricas.productos_stock_bajo?.toLocaleString("es-CL") || 0}</p>
+              </div>
+            </div>
+          </div>
+        `
+
+        // Añadir top productos
+        if (dashboardData.topProductos && dashboardData.topProductos.length > 0) {
+          htmlContent += `
+            <div style="margin-bottom: 40px;">
+              <h2 style="color: #1a202c; font-size: 24px; margin-bottom: 20px; font-weight: 700;">Top 5 Productos</h2>
+              <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <thead>
+                  <tr style="background: #f7fafc;">
+                    <th style="padding: 15px; text-align: left; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">#</th>
+                    <th style="padding: 15px; text-align: left; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">Producto</th>
+                    <th style="padding: 15px; text-align: right; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">Vendidos</th>
+                    <th style="padding: 15px; text-align: right; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">Ingresos</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${dashboardData.topProductos
+                    .map(
+                      (producto, index) => `
+                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                      <td style="padding: 15px; font-weight: 600; color: #667eea;">${index + 1}</td>
+                      <td style="padding: 15px; font-weight: 600; color: #1a202c;">${producto.nombre_producto}</td>
+                      <td style="padding: 15px; text-align: right; color: #4a5568;">${producto.cantidad_vendida?.toLocaleString("es-CL") || 0}</td>
+                      <td style="padding: 15px; text-align: right; font-weight: 700; color: #38a169;">${formatCLP(producto.ingresos)}</td>
+                    </tr>
+                  `,
+                    )
+                    .join("")}
+                </tbody>
+              </table>
+            </div>
+          `
+        }
       }
-      
+
+      // Añadir contenido específico para otras pestañas
+      if (activeTab === "ventas" && ventasData) {
+        htmlContent += `
+          <div style="margin-bottom: 40px;">
+            <h2 style="color: #1a202c; font-size: 24px; margin-bottom: 20px; font-weight: 700;">Resumen de Ventas</h2>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+              <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #667eea;">
+                <h3 style="color: #4a5568; font-size: 12px; text-transform: uppercase; margin-bottom: 8px;">Total Ventas</h3>
+                <p style="color: #1a202c; font-size: 24px; font-weight: 800; margin: 0;">${ventasData.resumen?.totalVentas?.toLocaleString("es-CL") || 0}</p>
+              </div>
+              <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #38a169;">
+                <h3 style="color: #4a5568; font-size: 12px; text-transform: uppercase; margin-bottom: 8px;">Ingresos Totales</h3>
+                <p style="color: #1a202c; font-size: 24px; font-weight: 800; margin: 0;">${formatCLP(ventasData.resumen?.ingresosTotales)}</p>
+              </div>
+              <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #805ad5;">
+                <h3 style="color: #4a5568; font-size: 12px; text-transform: uppercase; margin-bottom: 8px;">Ticket Promedio</h3>
+                <p style="color: #1a202c; font-size: 24px; font-weight: 800; margin: 0;">${formatCLP(ventasData.resumen?.ticketPromedio)}</p>
+              </div>
+            </div>
+          </div>
+        `
+      }
+
+      if (activeTab === "productos" && productosData) {
+        htmlContent += `
+          <div style="margin-bottom: 40px;">
+            <h2 style="color: #1a202c; font-size: 24px; margin-bottom: 20px; font-weight: 700;">Resumen de Productos</h2>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px;">
+              <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #667eea;">
+                <h3 style="color: #4a5568; font-size: 12px; text-transform: uppercase; margin-bottom: 8px;">Total Vendidos</h3>
+                <p style="color: #1a202c; font-size: 24px; font-weight: 800; margin: 0;">${productosData.resumen?.totalProductosVendidos?.toLocaleString("es-CL") || 0}</p>
+              </div>
+              <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #38a169;">
+                <h3 style="color: #4a5568; font-size: 12px; text-transform: uppercase; margin-bottom: 8px;">Ingresos Totales</h3>
+                <p style="color: #1a202c; font-size: 24px; font-weight: 800; margin: 0;">${formatCLP(productosData.resumen?.ingresosTotales)}</p>
+              </div>
+              <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #805ad5;">
+                <h3 style="color: #4a5568; font-size: 12px; text-transform: uppercase; margin-bottom: 8px;">Categoría Top</h3>
+                <p style="color: #1a202c; font-size: 18px; font-weight: 800; margin: 0;">${productosData.resumen?.categoriaTop || "N/A"}</p>
+              </div>
+              <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #ed8936;">
+                <h3 style="color: #4a5568; font-size: 12px; text-transform: uppercase; margin-bottom: 8px;">Marca Top</h3>
+                <p style="color: #1a202c; font-size: 18px; font-weight: 800; margin: 0;">${productosData.resumen?.marcaTop || "N/A"}</p>
+              </div>
+            </div>
+          </div>
+        `
+
+        if (productosData.productosTop && productosData.productosTop.length > 0) {
+          htmlContent += `
+            <div style="margin-bottom: 40px;">
+              <h2 style="color: #1a202c; font-size: 24px; margin-bottom: 20px; font-weight: 700;">Productos Más Vendidos</h2>
+              <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <thead>
+                  <tr style="background: #f7fafc;">
+                    <th style="padding: 15px; text-align: left; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">Producto</th>
+                    <th style="padding: 15px; text-align: left; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">Categoría</th>
+                    <th style="padding: 15px; text-align: left; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">Marca</th>
+                    <th style="padding: 15px; text-align: right; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">Vendidos</th>
+                    <th style="padding: 15px; text-align: right; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">Ingresos</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${productosData.productosTop
+                    .slice(0, 10)
+                    .map(
+                      (producto) => `
+                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                      <td style="padding: 15px; font-weight: 600; color: #1a202c;">${producto.nombre_producto}</td>
+                      <td style="padding: 15px; color: #4a5568;">${producto.nombre_categoria}</td>
+                      <td style="padding: 15px; color: #4a5568;">${producto.nombre_marca}</td>
+                      <td style="padding: 15px; text-align: right; font-weight: 600; color: #1a202c;">${producto.cantidad_vendida?.toLocaleString("es-CL") || 0}</td>
+                      <td style="padding: 15px; text-align: right; font-weight: 700; color: #38a169;">${formatCLP(producto.ingresos_producto)}</td>
+                    </tr>
+                  `,
+                    )
+                    .join("")}
+                </tbody>
+              </table>
+            </div>
+          `
+        }
+      }
+
+      // Añadir footer
+      htmlContent += `
+        <div style="margin-top: 60px; padding-top: 20px; border-top: 2px solid #e2e8f0; text-align: center; color: #718096;">
+          <p style="margin: 0; font-size: 14px;">
+            Reporte generado automáticamente por el Sistema de Reportes | ${new Date().toLocaleString("es-CL")}
+          </p>
+        </div>
+      `
+
+      exportElement.innerHTML = htmlContent
+      document.body.appendChild(exportElement)
+
+      // Capturar el elemento como imagen
+      const canvas = await html2canvas(exportElement, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: "#ffffff",
+        width: 1200,
+        height: exportElement.scrollHeight,
+      })
+
+      // Remover el elemento temporal
+      document.body.removeChild(exportElement)
+
+      // Crear el PDF
+      const imgData = canvas.toDataURL("image/png")
+      const pdf = new jsPDF("p", "mm", "a4")
+
+      const pdfWidth = pdf.internal.pageSize.getWidth()
+      const pdfHeight = pdf.internal.pageSize.getHeight()
+      const imgWidth = pdfWidth - 20 // Margen de 10mm a cada lado
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+
+      let heightLeft = imgHeight
+      let position = 10 // Margen superior
+
+      // Añadir la primera página
+      pdf.addImage(imgData, "PNG", 10, position, imgWidth, imgHeight)
+      heightLeft -= pdfHeight - 20 // Restar márgenes
+
+      // Añadir páginas adicionales si es necesario
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight + 10
+        pdf.addPage()
+        pdf.addImage(imgData, "PNG", 10, position, imgWidth, imgHeight)
+        heightLeft -= pdfHeight - 20
+      }
+
+      // Generar nombre del archivo
+      const fileName = `reporte-${activeTab}-${new Date().toISOString().split("T")[0]}.pdf`
+
+      // Descargar el PDF
+      pdf.save(fileName)
+
+      console.log("✅ PDF generado exitosamente:", fileName)
+    } catch (error) {
+      console.error("❌ Error al generar PDF:", error)
+      setError("Error al generar el PDF. Por favor, inténtalo de nuevo.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    testConnection().then((connected) => {
+      if (!connected) {
+        setError("No se puede conectar con el servidor. Verifica que esté corriendo en puerto 3000.")
+        return
+      }
+
       const loadData = () => {
         switch (activeTab) {
-          case 'dashboard':
-            loadDashboard();
-            break;
-          case 'ventas':
-            loadVentas();
-            break;
-          case 'productos':
-            loadProductos();
-            break;
-          case 'inventario':
-            loadInventario();
-            break;
-          case 'clientes':
-            loadClientes();
-            break;
-          case 'pedidos':
-            loadPedidos();
-            break;
-          case 'categorias':
-            loadCategorias();
-            break;
+          case "dashboard":
+            loadDashboard()
+            break
+          case "ventas":
+            loadVentas()
+            break
+          case "productos":
+            loadProductos()
+            break
+          case "inventario":
+            loadInventario()
+            break
+          case "clientes":
+            loadClientes()
+            break
+          case "pedidos":
+            loadPedidos()
+            break
+          case "categorias":
+            loadCategorias()
+            break
           default:
-            loadDashboard();
+            loadDashboard()
         }
-      };
+      }
 
-      loadData();
-    });
-  }, [activeTab]);
+      loadData()
+    })
+  }, [activeTab])
 
   // Componente para métricas del dashboard
-  const MetricCard = ({ title, value, icon: Icon, trend, color = 'blue', isMonetary = false }) => (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-all duration-200 hover:border-gray-200">
-      <div className="flex items-center justify-between">
-        <div className="flex-1">
-          <div className="flex items-center mb-2">
-            <div className={`p-2 rounded-lg mr-3 ${
-              color === 'green' ? 'bg-green-100' :
-              color === 'blue' ? 'bg-blue-100' :
-              color === 'purple' ? 'bg-purple-100' :
-              color === 'orange' ? 'bg-orange-100' :
-              color === 'red' ? 'bg-red-100' :
-              'bg-gray-100'
-            }`}>
-              <Icon className={`w-5 h-5 ${
-                color === 'green' ? 'text-green-600' :
-                color === 'blue' ? 'text-blue-600' :
-                color === 'purple' ? 'text-purple-600' :
-                color === 'orange' ? 'text-orange-600' :
-                color === 'red' ? 'text-red-600' :
-                'text-gray-600'
-              }`} />
-            </div>
-            <p className="text-sm font-medium text-gray-600">{title}</p>
-          </div>
-          <p className={`text-2xl font-bold ${
-            color === 'green' ? 'text-green-600' :
-            color === 'blue' ? 'text-blue-600' :
-            color === 'purple' ? 'text-purple-600' :
-            color === 'orange' ? 'text-orange-600' :
-            color === 'red' ? 'text-red-600' :
-            'text-gray-900'
-          }`}>
-            {isMonetary && typeof value === 'number' ? formatCLP(value) : 
-             typeof value === 'number' ? value.toLocaleString('es-CL') : value}
-          </p>
-          {trend && (
-            <div className={`flex items-center mt-2 text-sm ${
-              trend > 0 ? 'text-green-600' : 
-              trend < 0 ? 'text-red-600' : 
-              'text-gray-500'
-            }`}>
-              {trend > 0 ? (
-                <ArrowUp className="w-4 h-4 mr-1" />
-              ) : trend < 0 ? (
-                <ArrowDown className="w-4 h-4 mr-1" />
-              ) : (
-                <Minus className="w-4 h-4 mr-1" />
-              )}
-              <span>{Math.abs(trend)}%</span>
-            </div>
-          )}
-        </div>
+  const MetricCard = ({ title, value, icon: Icon, trend, color = "blue", isMonetary = false }) => (
+    <div className="metric-card fade-in-up">
+      <div className={`metric-icon ${color}`}>
+        <Icon size={24} />
       </div>
+      <div className="metric-title">{title}</div>
+      <div className="metric-value">
+        {isMonetary && typeof value === "number"
+          ? formatCLP(value)
+          : typeof value === "number"
+            ? value.toLocaleString("es-CL")
+            : value}
+      </div>
+      {trend !== undefined && (
+        <div className={`metric-trend ${trend > 0 ? "positive" : trend < 0 ? "negative" : "neutral"}`}>
+          {trend > 0 ? <ArrowUp size={16} /> : trend < 0 ? <ArrowDown size={16} /> : <Minus size={16} />}
+          <span>{Math.abs(trend)}% vs mes anterior</span>
+        </div>
+      )}
     </div>
-  );
+  )
 
   // Componente para filtros
   const FiltersPanel = () => (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div className="flex flex-col sm:flex-row gap-4 flex-1">
-          <div className="flex-1 min-w-48">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              <Calendar className="w-4 h-4 inline mr-1" />
-              Fecha Inicio
-            </label>
-            <input
-              type="date"
-              value={filters.fechaInicio}
-              onChange={(e) => setFilters({...filters, fechaInicio: e.target.value})}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-            />
-          </div>
-          <div className="flex-1 min-w-48">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              <Calendar className="w-4 h-4 inline mr-1" />
-              Fecha Fin
-            </label>
-            <input
-              type="date"
-              value={filters.fechaFin}
-              onChange={(e) => setFilters({...filters, fechaFin: e.target.value})}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-            />
-          </div>
-          <div className="flex-1 min-w-32">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Período
-            </label>
-            <select
-              value={filters.periodo}
-              onChange={(e) => setFilters({...filters, periodo: e.target.value})}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-            >
-              <option value="dia">Día</option>
-              <option value="mes">Mes</option>
-              <option value="año">Año</option>
-            </select>
-          </div>
+    <div className="filters-panel slide-in-right">
+      <div className="filters-title">
+        <Filter size={20} />
+        Filtros de Reporte
+      </div>
+      <div className="filters-grid">
+        <div className="form-group">
+          <label className="form-label">
+            <Calendar size={16} />
+            Fecha Inicio
+          </label>
+          <input
+            type="date"
+            value={filters.fechaInicio}
+            onChange={(e) => setFilters({ ...filters, fechaInicio: e.target.value })}
+            className="form-input"
+          />
         </div>
-        <div className="flex gap-2">
+        <div className="form-group">
+          <label className="form-label">
+            <Calendar size={16} />
+            Fecha Fin
+          </label>
+          <input
+            type="date"
+            value={filters.fechaFin}
+            onChange={(e) => setFilters({ ...filters, fechaFin: e.target.value })}
+            className="form-input"
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Período</label>
+          <select
+            value={filters.periodo}
+            onChange={(e) => setFilters({ ...filters, periodo: e.target.value })}
+            className="form-select"
+          >
+            <option value="dia">Día</option>
+            <option value="mes">Mes</option>
+            <option value="año">Año</option>
+          </select>
+        </div>
+        <div className="form-group">
           <button
             onClick={() => {
               switch (activeTab) {
-                case 'ventas': loadVentas(); break;
-                case 'productos': loadProductos(); break;
-                case 'inventario': loadInventario(); break;
-                case 'clientes': loadClientes(); break;
-                case 'pedidos': loadPedidos(); break;
-                case 'categorias': loadCategorias(); break;
-                default: loadDashboard();
+                case "ventas":
+                  loadVentas()
+                  break
+                case "productos":
+                  loadProductos()
+                  break
+                case "inventario":
+                  loadInventario()
+                  break
+                case "clientes":
+                  loadClientes()
+                  break
+                case "pedidos":
+                  loadPedidos()
+                  break
+                case "categorias":
+                  loadCategorias()
+                  break
+                default:
+                  loadDashboard()
               }
             }}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 flex items-center gap-2 font-medium"
+            className="btn btn-primary"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw size={16} />
             Actualizar
           </button>
         </div>
       </div>
     </div>
-  );
+  )
 
-  // Tooltip personalizado para mostrar formato CLP
+  // Tooltip personalizado
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-white p-4 border border-gray-200 rounded-lg shadow-lg backdrop-blur-sm">
-          <p className="font-semibold text-gray-900 mb-2">{label}</p>
+        <div className="glass" style={{ padding: "1rem", borderRadius: "12px", boxShadow: "var(--shadow-medium)" }}>
+          <p style={{ fontWeight: "600", marginBottom: "0.5rem", color: "#1a202c" }}>{label}</p>
           {payload.map((entry, index) => (
-            <p key={index} style={{ color: entry.color }} className="text-sm flex items-center">
-              <div 
-                className="w-3 h-3 rounded-full mr-2" 
-                style={{ backgroundColor: entry.color }}
+            <div key={index} style={{ display: "flex", alignItems: "center", marginBottom: "0.25rem" }}>
+              <div
+                style={{
+                  width: "12px",
+                  height: "12px",
+                  backgroundColor: entry.color,
+                  borderRadius: "50%",
+                  marginRight: "0.5rem",
+                }}
               ></div>
-              {entry.name}: {
-                entry.name.toLowerCase().includes('ingreso') || 
-                entry.name.toLowerCase().includes('total') ||
-                entry.name.toLowerCase().includes('gasto') ||
-                entry.name.toLowerCase().includes('valor') ?
-                formatCLP(entry.value) : 
-                entry.value.toLocaleString('es-CL')
-              }
-            </p>
+              <span style={{ fontSize: "0.875rem", color: "#4a5568" }}>
+                {entry.name}:{" "}
+                <strong>
+                  {entry.name.toLowerCase().includes("ingreso") ||
+                  entry.name.toLowerCase().includes("total") ||
+                  entry.name.toLowerCase().includes("gasto") ||
+                  entry.name.toLowerCase().includes("valor")
+                    ? formatCLP(entry.value)
+                    : entry.value.toLocaleString("es-CL")}
+                </strong>
+              </span>
+            </div>
           ))}
         </div>
-      );
+      )
     }
-    return null;
-  };
+    return null
+  }
 
   // Dashboard General
   const DashboardView = () => (
-    <div className="space-y-8">
+    <div>
       {dashboardData?.metricas && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+        <div className="metrics-grid">
           <MetricCard
             title="Ventas del Mes"
             value={dashboardData.metricas.ventas_mes}
-            icon={DollarSign}
-            color="green"
+            icon={ShoppingCart}
+            color="blue"
           />
           <MetricCard
             title="Ingresos del Mes"
             value={dashboardData.metricas.ingresos_mes}
-            icon={TrendingUp}
-            color="blue"
+            icon={DollarSign}
+            color="green"
             isMonetary={true}
           />
           <MetricCard
@@ -379,94 +616,72 @@ const AdminReportes = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <div className="content-grid">
         {/* Gráfico de ventas diarias */}
-        <div className="xl:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-xl font-semibold text-gray-900">
-                Ventas Últimos 7 Días
-              </h3>
-              <p className="text-sm text-gray-500 mt-1">
-                Evolución de ventas diarias
-              </p>
+        <div className="content-card" style={{ gridColumn: "1 / -1" }}>
+          <div className="card-header">
+            <div className="card-title">Ventas Últimos 7 Días</div>
+            <div className="card-subtitle">Evolución de ventas diarias</div>
+          </div>
+          <div className="card-content">
+            <div className="chart-container">
+              <ResponsiveContainer width="100%" height={350}>
+                <LineChart data={dashboardData?.ventasDiarias || []}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="fecha" stroke="#64748b" fontSize={12} />
+                  <YAxis stroke="#64748b" fontSize={12} tickFormatter={(value) => formatCLPCompact(value)} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Line
+                    type="monotone"
+                    dataKey="total_ventas"
+                    stroke="#667eea"
+                    strokeWidth={3}
+                    dot={{ fill: "#667eea", strokeWidth: 2, r: 6 }}
+                    activeDot={{ r: 8, stroke: "#667eea", strokeWidth: 2, fill: "#fff" }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
           </div>
-          <ResponsiveContainer width="100%" height={320}>
-            <LineChart data={dashboardData?.ventasDiarias || []}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="fecha" stroke="#6b7280" fontSize={12} />
-              <YAxis stroke="#6b7280" fontSize={12} tickFormatter={(value) => formatCLPCompact(value)} />
-              <Tooltip content={<CustomTooltip />} />
-              <Line 
-                type="monotone" 
-                dataKey="total_ventas" 
-                stroke="#3B82F6" 
-                strokeWidth={3}
-                dot={{ fill: '#3B82F6', strokeWidth: 2, r: 6 }}
-                activeDot={{ r: 8, stroke: '#3B82F6', strokeWidth: 2 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
         </div>
 
         {/* Top productos */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <div className="mb-6">
-            <h3 className="text-xl font-semibold text-gray-900">
-              Top 5 Productos del Mes
-            </h3>
-            <p className="text-sm text-gray-500 mt-1">
-              Más vendidos este mes
-            </p>
+        <div className="content-card">
+          <div className="card-header">
+            <div className="card-title">Top 5 Productos</div>
+            <div className="card-subtitle">Más vendidos este mes</div>
           </div>
-          <div className="space-y-4">
-            {dashboardData?.topProductos?.map((producto, index) => (
-              <div key={index} className="group p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all duration-200 cursor-pointer">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center">
-                      <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
-                        <span className="text-blue-600 font-semibold text-sm">#{index + 1}</span>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
-                          {producto.nombre_producto}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {producto.cantidad_vendida} unidades
-                        </p>
-                      </div>
+          <div className="card-content">
+            <div className="item-list">
+              {dashboardData?.topProductos?.map((producto, index) => (
+                <div key={index} className="item-card">
+                  <div className="item-header">
+                    <div className="item-rank">#{index + 1}</div>
+                    <div className="item-info">
+                      <div className="item-name">{producto.nombre_producto}</div>
+                      <div className="item-details">{producto.cantidad_vendida} unidades vendidas</div>
+                    </div>
+                    <div className="item-value">
+                      <div className="item-amount">{formatCLP(producto.ingresos)}</div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-green-600">
-                      {formatCLP(producto.ingresos)}
-                    </p>
-                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </div>
     </div>
-  );
+  )
 
   // Vista de Ventas
   const VentasView = () => (
-    <div className="space-y-6">
+    <div>
       <FiltersPanel />
-      
       {ventasData && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <MetricCard
-              title="Total Ventas"
-              value={ventasData.resumen.totalVentas}
-              icon={ShoppingCart}
-              color="blue"
-            />
+          <div className="metrics-grid">
+            <MetricCard title="Total Ventas" value={ventasData.resumen.totalVentas} icon={ShoppingCart} color="blue" />
             <MetricCard
               title="Ingresos Totales"
               value={ventasData.resumen.ingresosTotales}
@@ -483,71 +698,68 @@ const AdminReportes = () => {
             />
           </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            {/* Gráfico de ventas por período */}
-            <div className="xl:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <div className="mb-6">
-                <h3 className="text-xl font-semibold text-gray-900">
-                  Ventas por Período
-                </h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  Evolución de ventas por período seleccionado
-                </p>
+          <div className="content-grid">
+            <div className="content-card" style={{ gridColumn: "span 2" }}>
+              <div className="card-header">
+                <div className="card-title">Ventas por Período</div>
+                <div className="card-subtitle">Evolución de ventas por período seleccionado</div>
               </div>
-              <ResponsiveContainer width="100%" height={320}>
-                <BarChart data={ventasData.ventasPorPeriodo}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="periodo" stroke="#6b7280" fontSize={12} />
-                  <YAxis stroke="#6b7280" fontSize={12} tickFormatter={(value) => formatCLPCompact(value)} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="total_ventas" fill="#3B82F6" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="card-content">
+                <div className="chart-container">
+                  <ResponsiveContainer width="100%" height={350}>
+                    <BarChart data={ventasData.ventasPorPeriodo}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                      <XAxis dataKey="periodo" stroke="#64748b" fontSize={12} />
+                      <YAxis stroke="#64748b" fontSize={12} tickFormatter={(value) => formatCLPCompact(value)} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Bar dataKey="total_ventas" fill="#667eea" radius={[8, 8, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             </div>
 
-            {/* Métodos de pago */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <div className="mb-6">
-                <h3 className="text-xl font-semibold text-gray-900">
-                  Ventas por Método de Pago
-                </h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  Distribución de métodos de pago
-                </p>
+            <div className="content-card">
+              <div className="card-header">
+                <div className="card-title">Métodos de Pago</div>
+                <div className="card-subtitle">Distribución de ventas</div>
               </div>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={ventasData.metodosPago}
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    dataKey="cantidad_ventas"
-                    nameKey="metodo_pago"
-                  >
-                    {ventasData.metodosPago?.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
+              <div className="card-content">
+                <div className="chart-container">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={ventasData.metodosPago}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        dataKey="cantidad_ventas"
+                        nameKey="metodo_pago"
+                      >
+                        {ventasData.metodosPago?.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             </div>
           </div>
         </>
       )}
     </div>
-  );
+  )
 
   // Vista de Productos
   const ProductosView = () => (
-    <div className="space-y-6">
+    <div>
       <FiltersPanel />
-      
       {productosData && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="metrics-grid">
             <MetricCard
               title="Total Vendidos"
               value={productosData.resumen.totalProductosVendidos}
@@ -567,95 +779,67 @@ const AdminReportes = () => {
               icon={TrendingUp}
               color="purple"
             />
-            <MetricCard
-              title="Marca Top"
-              value={productosData.resumen.marcaTop}
-              icon={Eye}
-              color="orange"
-            />
+            <MetricCard title="Marca Top" value={productosData.resumen.marcaTop} icon={Eye} color="orange" />
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-xl font-semibold text-gray-900">
-                Productos Más Vendidos
-              </h3>
+          <div className="table-container">
+            <div className="table-header">
+              <div className="card-title">Productos Más Vendidos</div>
+              <div className="card-subtitle">Ranking de productos por ventas</div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Producto
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Categoría
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Marca
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Vendidos
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ingresos
-                    </th>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>Categoría</th>
+                  <th>Marca</th>
+                  <th style={{ textAlign: "right" }}>Vendidos</th>
+                  <th style={{ textAlign: "right" }}>Ingresos</th>
+                </tr>
+              </thead>
+              <tbody>
+                {productosData.productosTop?.map((producto, index) => (
+                  <tr key={index}>
+                    <td>
+                      <div>
+                        <div style={{ fontWeight: "600", marginBottom: "0.25rem" }}>{producto.nombre_producto}</div>
+                        <div style={{ fontSize: "0.875rem", color: "#718096" }}>{producto.descripcion}</div>
+                      </div>
+                    </td>
+                    <td>
+                      <span className="badge badge-primary">{producto.nombre_categoria}</span>
+                    </td>
+                    <td style={{ fontWeight: "600" }}>{producto.nombre_marca}</td>
+                    <td style={{ textAlign: "right", fontWeight: "600" }}>
+                      {producto.cantidad_vendida.toLocaleString("es-CL")}
+                    </td>
+                    <td style={{ textAlign: "right", fontWeight: "700", color: "#38a169" }}>
+                      {formatCLP(producto.ingresos_producto)}
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {productosData.productosTop?.map((producto, index) => (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {producto.nombre_producto}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {producto.descripcion}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {producto.nombre_categoria}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {producto.nombre_marca}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                        {producto.cantidad_vendida.toLocaleString('es-CL')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600 text-right">
-                        {formatCLP(producto.ingresos_producto)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           </div>
         </>
       )}
     </div>
-  );
+  )
 
   // Vista de Inventario
   const InventarioView = () => (
-    <div className="space-y-6">
+    <div>
       <FiltersPanel />
-      
       {inventarioData && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="metrics-grid">
             <MetricCard
               title="Total Productos"
               value={inventarioData.estadisticas.totalProductos}
               icon={Package}
               color="blue"
             />
-            <MetricCard
-              title="Sin Stock"
-              value={inventarioData.estadisticas.sinStock}
-              icon={XCircle}
-              color="red"
-            />
+            <MetricCard title="Sin Stock" value={inventarioData.estadisticas.sinStock} icon={XCircle} color="red" />
             <MetricCard
               title="Stock Bajo"
               value={inventarioData.estadisticas.stockBajo}
@@ -671,46 +855,66 @@ const AdminReportes = () => {
             />
           </div>
 
-          {/* Alertas */}
           {(inventarioData.alertas.sinStock.length > 0 || inventarioData.alertas.stockBajo.length > 0) && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="content-grid">
               {inventarioData.alertas.sinStock.length > 0 && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-                  <div className="flex items-center mb-4">
-                    <XCircle className="w-5 h-5 text-red-600 mr-2" />
-                    <h4 className="text-lg font-semibold text-red-800">Productos Sin Stock</h4>
+                <div className="alert alert-danger">
+                  <div className="alert-header">
+                    <div className="alert-icon" style={{ background: "rgba(239, 68, 68, 0.1)", color: "#ef4444" }}>
+                      <XCircle size={24} />
+                    </div>
+                    <div>
+                      <div className="alert-title">Productos Sin Stock</div>
+                      <div className="alert-subtitle">Requieren reposición inmediata</div>
+                    </div>
                   </div>
-                  <div className="space-y-2">
+                  <div className="alert-content">
                     {inventarioData.alertas.sinStock.slice(0, 5).map((item, index) => (
-                      <p key={index} className="text-sm text-red-700">
-                        <strong>{item.nombre_producto}</strong> - {item.nombre_marca}
-                      </p>
+                      <div key={index} className="alert-item">
+                        <div style={{ fontWeight: "600" }}>{item.nombre_producto}</div>
+                        <div style={{ fontSize: "0.875rem", color: "#718096" }}>{item.nombre_marca}</div>
+                      </div>
                     ))}
                     {inventarioData.alertas.sinStock.length > 5 && (
-                      <p className="text-sm font-medium text-red-700">
-                        +{inventarioData.alertas.sinStock.length - 5} productos más
-                      </p>
+                      <div style={{ textAlign: "center", paddingTop: "1rem" }}>
+                        <span className="badge badge-danger">
+                          +{inventarioData.alertas.sinStock.length - 5} productos más
+                        </span>
+                      </div>
                     )}
                   </div>
                 </div>
               )}
 
               {inventarioData.alertas.stockBajo.length > 0 && (
-                <div className="bg-orange-50 border border-orange-200 rounded-xl p-6">
-                  <div className="flex items-center mb-4">
-                    <AlertTriangle className="w-5 h-5 text-orange-600 mr-2" />
-                    <h4 className="text-lg font-semibold text-orange-800">Stock Bajo</h4>
+                <div className="alert alert-warning">
+                  <div className="alert-header">
+                    <div className="alert-icon" style={{ background: "rgba(245, 158, 11, 0.1)", color: "#f59e0b" }}>
+                      <AlertTriangle size={24} />
+                    </div>
+                    <div>
+                      <div className="alert-title">Stock Bajo</div>
+                      <div className="alert-subtitle">Productos con inventario limitado</div>
+                    </div>
                   </div>
-                  <div className="space-y-2">
+                  <div className="alert-content">
                     {inventarioData.alertas.stockBajo.slice(0, 5).map((item, index) => (
-                      <p key={index} className="text-sm text-orange-700">
-                        <strong>{item.nombre_producto}</strong> - Stock: {item.stock}
-                      </p>
+                      <div key={index} className="alert-item">
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div>
+                            <div style={{ fontWeight: "600" }}>{item.nombre_producto}</div>
+                            <div style={{ fontSize: "0.875rem", color: "#718096" }}>{item.nombre_marca}</div>
+                          </div>
+                          <span className="badge badge-warning">{item.stock}</span>
+                        </div>
+                      </div>
                     ))}
                     {inventarioData.alertas.stockBajo.length > 5 && (
-                      <p className="text-sm font-medium text-orange-700">
-                        +{inventarioData.alertas.stockBajo.length - 5} productos más
-                      </p>
+                      <div style={{ textAlign: "center", paddingTop: "1rem" }}>
+                        <span className="badge badge-warning">
+                          +{inventarioData.alertas.stockBajo.length - 5} productos más
+                        </span>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -720,16 +924,15 @@ const AdminReportes = () => {
         </>
       )}
     </div>
-  );
+  )
 
   // Vista de Clientes
   const ClientesView = () => (
-    <div className="space-y-6">
+    <div>
       <FiltersPanel />
-      
       {clientesData && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="metrics-grid">
             <MetricCard
               title="Total Clientes"
               value={clientesData.estadisticas.totalClientes}
@@ -738,13 +941,13 @@ const AdminReportes = () => {
             />
             <MetricCard
               title="Cliente Top"
-              value={clientesData.estadisticas.clienteTop?.nombre_usuario || 'N/A'}
+              value={clientesData.estadisticas.clienteTop?.nombre_usuario || "N/A"}
               icon={TrendingUp}
               color="green"
             />
             <MetricCard
               title="Región Top"
-              value={clientesData.estadisticas.regionTop?.nombre_region || 'N/A'}
+              value={clientesData.estadisticas.regionTop?.nombre_region || "N/A"}
               icon={Eye}
               color="purple"
             />
@@ -757,74 +960,70 @@ const AdminReportes = () => {
             />
           </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            {/* Top clientes */}
-            <div className="xl:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <div className="mb-6">
-                <h3 className="text-xl font-semibold text-gray-900">
-                  Clientes Más Activos
-                </h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  Clientes con mayor volumen de compras
-                </p>
+          <div className="content-grid">
+            <div className="content-card" style={{ gridColumn: "span 2" }}>
+              <div className="card-header">
+                <div className="card-title">Clientes Más Activos</div>
+                <div className="card-subtitle">Clientes con mayor volumen de compras</div>
               </div>
-              <div className="space-y-4">
-                {clientesData.clientesTop?.map((cliente, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                    <div>
-                      <p className="font-medium text-gray-900">
-                        {cliente.nombre_usuario} {cliente.apellido_usuario}
-                      </p>
-                      <p className="text-sm text-gray-500">{cliente.correo}</p>
-                      <p className="text-sm text-blue-600">{cliente.nombre_region}</p>
+              <div className="card-content">
+                <div className="item-list">
+                  {clientesData.clientesTop?.map((cliente, index) => (
+                    <div key={index} className="item-card">
+                      <div className="item-header">
+                        <div className="item-rank">#{index + 1}</div>
+                        <div className="item-info">
+                          <div className="item-name">
+                            {cliente.nombre_usuario} {cliente.apellido_usuario}
+                          </div>
+                          <div className="item-details">{cliente.correo}</div>
+                          <span className="badge badge-primary" style={{ marginTop: "0.25rem" }}>
+                            {cliente.nombre_region}
+                          </span>
+                        </div>
+                        <div className="item-value">
+                          <div className="item-amount">{formatCLP(cliente.total_gastado)}</div>
+                          <div className="item-meta">{cliente.total_pedidos} pedidos</div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-green-600">
-                        {formatCLP(cliente.total_gastado)}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {cliente.total_pedidos} pedidos
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
 
-            {/* Distribución geográfica */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <div className="mb-6">
-                <h3 className="text-xl font-semibold text-gray-900">
-                  Distribución por Región
-                </h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  Clientes por región
-                </p>
+            <div className="content-card">
+              <div className="card-header">
+                <div className="card-title">Por Región</div>
+                <div className="card-subtitle">Distribución de clientes</div>
               </div>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={clientesData.distribucionGeografica}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="nombre_region" stroke="#6b7280" fontSize={12} />
-                  <YAxis stroke="#6b7280" fontSize={12} />
-                  <Tooltip />
-                  <Bar dataKey="total_clientes" fill="#3B82F6" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="card-content">
+                <div className="chart-container">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={clientesData.distribucionGeografica}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                      <XAxis dataKey="nombre_region" stroke="#64748b" fontSize={12} />
+                      <YAxis stroke="#64748b" fontSize={12} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Bar dataKey="total_clientes" fill="#667eea" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             </div>
           </div>
         </>
       )}
     </div>
-  );
+  )
 
   // Vista de Pedidos
   const PedidosView = () => (
-    <div className="space-y-6">
+    <div>
       <FiltersPanel />
-      
       {pedidosData && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="metrics-grid">
             <MetricCard
               title="Total Pedidos"
               value={pedidosData.estadisticas.totalPedidos}
@@ -851,72 +1050,69 @@ const AdminReportes = () => {
             />
           </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            {/* Estados de pedidos */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <div className="mb-6">
-                <h3 className="text-xl font-semibold text-gray-900">
-                  Estados de Pedidos
-                </h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  Distribución por estado
-                </p>
+          <div className="content-grid">
+            <div className="content-card">
+              <div className="card-header">
+                <div className="card-title">Estados de Pedidos</div>
+                <div className="card-subtitle">Distribución por estado</div>
               </div>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={pedidosData.estadosPedidos}
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    dataKey="cantidad_pedidos"
-                    nameKey="nombre_estado"
-                  >
-                    {pedidosData.estadosPedidos?.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
+              <div className="card-content">
+                <div className="chart-container">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={pedidosData.estadosPedidos}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        dataKey="cantidad_pedidos"
+                        nameKey="nombre_estado"
+                      >
+                        {pedidosData.estadosPedidos?.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             </div>
 
-            {/* Pedidos por día */}
-            <div className="xl:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <div className="mb-6">
-                <h3 className="text-xl font-semibold text-gray-900">
-                  Pedidos por Día
-                </h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  Evolución diaria de pedidos
-                </p>
+            <div className="content-card" style={{ gridColumn: "span 2" }}>
+              <div className="card-header">
+                <div className="card-title">Pedidos por Día</div>
+                <div className="card-subtitle">Evolución diaria de pedidos</div>
               </div>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={pedidosData.pedidosPorPeriodo}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="fecha" stroke="#6b7280" fontSize={12} />
-                  <YAxis stroke="#6b7280" fontSize={12} />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="total_pedidos" stroke="#3B82F6" strokeWidth={2} />
-                  <Line type="monotone" dataKey="pedidos_completados" stroke="#10B981" strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
+              <div className="card-content">
+                <div className="chart-container">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={pedidosData.pedidosPorPeriodo}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                      <XAxis dataKey="fecha" stroke="#64748b" fontSize={12} />
+                      <YAxis stroke="#64748b" fontSize={12} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Line type="monotone" dataKey="total_pedidos" stroke="#667eea" strokeWidth={3} />
+                      <Line type="monotone" dataKey="pedidos_completados" stroke="#43e97b" strokeWidth={3} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             </div>
           </div>
         </>
       )}
     </div>
-  );
+  )
 
   // Vista de Categorías
   const CategoriasView = () => (
-    <div className="space-y-6">
+    <div>
       <FiltersPanel />
-      
       {categoriasData && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="metrics-grid">
             <MetricCard
               title="Total Categorías"
               value={categoriasData.estadisticas.totalCategorias}
@@ -925,7 +1121,7 @@ const AdminReportes = () => {
             />
             <MetricCard
               title="Categoría Top"
-              value={categoriasData.estadisticas.categoriaTop?.nombre_categoria || 'N/A'}
+              value={categoriasData.estadisticas.categoriaTop?.nombre_categoria || "N/A"}
               icon={TrendingUp}
               color="green"
             />
@@ -938,66 +1134,55 @@ const AdminReportes = () => {
             />
             <MetricCard
               title="Más Productos"
-              value={categoriasData.estadisticas.categoriaMasProductos?.nombre_categoria || 'N/A'}
+              value={categoriasData.estadisticas.categoriaMasProductos?.nombre_categoria || "N/A"}
               icon={Package}
               color="orange"
             />
           </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            {/* Rendimiento por categoría */}
-            <div className="xl:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <div className="mb-6">
-                <h3 className="text-xl font-semibold text-gray-900">
-                  Rendimiento por Categoría
-                </h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  Ingresos por categoría de productos
-                </p>
+          <div className="content-grid">
+            <div className="content-card" style={{ gridColumn: "span 2" }}>
+              <div className="card-header">
+                <div className="card-title">Rendimiento por Categoría</div>
+                <div className="card-subtitle">Ingresos por categoría de productos</div>
               </div>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={categoriasData.rendimientoCategorias}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="nombre_categoria" stroke="#6b7280" fontSize={12} />
-                  <YAxis stroke="#6b7280" fontSize={12} tickFormatter={(value) => formatCLPCompact(value)} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="ingresos_categoria" fill="#3B82F6" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="card-content">
+                <div className="chart-container">
+                  <ResponsiveContainer width="100%" height={350}>
+                    <BarChart data={categoriasData.rendimientoCategorias}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                      <XAxis dataKey="nombre_categoria" stroke="#64748b" fontSize={12} />
+                      <YAxis stroke="#64748b" fontSize={12} tickFormatter={(value) => formatCLPCompact(value)} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Bar dataKey="ingresos_categoria" fill="#667eea" radius={[8, 8, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             </div>
 
-            {/* Tabla de categorías */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-xl font-semibold text-gray-900">
-                  Detalle de Categorías
-                </h3>
+            <div className="content-card">
+              <div className="card-header">
+                <div className="card-title">Detalle de Categorías</div>
+                <div className="card-subtitle">Resumen por categoría</div>
               </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+              <div className="card-content">
+                <table className="table">
+                  <thead>
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Categoría
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Productos
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Ingresos
-                      </th>
+                      <th>Categoría</th>
+                      <th style={{ textAlign: "right" }}>Productos</th>
+                      <th style={{ textAlign: "right" }}>Ingresos</th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody>
                     {categoriasData.rendimientoCategorias?.map((categoria, index) => (
-                      <tr key={index} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="font-medium text-gray-900">{categoria.nombre_categoria}</span>
+                      <tr key={index}>
+                        <td style={{ fontWeight: "600" }}>{categoria.nombre_categoria}</td>
+                        <td style={{ textAlign: "right", fontWeight: "600" }}>
+                          {categoria.productos_categoria.toLocaleString("es-CL")}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                          {categoria.productos_categoria.toLocaleString('es-CL')}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600 text-right">
+                        <td style={{ textAlign: "right", fontWeight: "700", color: "#38a169" }}>
                           {formatCLP(categoria.ingresos_categoria)}
                         </td>
                       </tr>
@@ -1010,108 +1195,97 @@ const AdminReportes = () => {
         </>
       )}
     </div>
-  );
+  )
 
   const tabs = [
-    { id: 'dashboard', name: 'Dashboard', icon: TrendingUp },
-    { id: 'ventas', name: 'Ventas', icon: DollarSign },
-    { id: 'productos', name: 'Productos', icon: Package },
-    { id: 'inventario', name: 'Inventario', icon: AlertTriangle },
-    { id: 'clientes', name: 'Clientes', icon: Users },
-    { id: 'pedidos', name: 'Pedidos', icon: ShoppingCart },
-    { id: 'categorias', name: 'Categorías', icon: FileText }
-  ];
+    { id: "dashboard", name: "Dashboard", icon: TrendingUp },
+    { id: "ventas", name: "Ventas", icon: DollarSign },
+    { id: "productos", name: "Productos", icon: Package },
+    { id: "inventario", name: "Inventario", icon: AlertTriangle },
+    { id: "clientes", name: "Clientes", icon: Users },
+    { id: "pedidos", name: "Pedidos", icon: ShoppingCart },
+    { id: "categorias", name: "Categorías", icon: FileText },
+  ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header mejorado */}
-        <div className="mb-8">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h1 className="text-4xl font-bold text-gray-900 mb-2">
-                Panel de Reportes
-              </h1>
-              <p className="text-lg text-gray-600">
-                Análisis completo de ventas, inventario y rendimiento del negocio
-              </p>
-            </div>
-            <div className="flex items-center gap-3 mt-6 lg:mt-0">
-              <button className="px-4 py-2 text-gray-600 bg-white rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors flex items-center gap-2">
-                <Settings className="w-4 h-4" />
-                Configurar
-              </button>
-              <button className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2">
-                <Mail className="w-4 h-4" />
-                Enviar Reporte
-              </button>
-            </div>
+    <div className="dashboard-container">
+      <div className="dashboard-content">
+        {/* Header */}
+        <div className="dashboard-header">
+          <h1 className="dashboard-title">Panel de Reportes</h1>
+          <p className="dashboard-subtitle">
+            Análisis completo de ventas, inventario y rendimiento del negocio con insights en tiempo real
+          </p>
+          <div className="dashboard-actions">
+            <button className="btn btn-primary" onClick={exportToPDF} disabled={loading}>
+              <Download size={16} />
+              {loading ? "Generando PDF..." : "Exportar PDF"}
+            </button>
+            <button className="btn btn-primary">
+              <Mail size={16} />
+              Enviar Reporte
+            </button>
           </div>
         </div>
 
-        {/* Tabs mejorados */}
-        <div className="mb-8">
-          <nav className="flex space-x-1 overflow-x-auto bg-white p-1 rounded-xl shadow-sm border border-gray-100">
+        {/* Tabs */}
+        <div className="tabs-container">
+          <nav className="tabs-nav">
             {tabs.map((tab) => {
-              const Icon = tab.icon;
+              const Icon = tab.icon
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center px-6 py-3 text-sm font-medium rounded-lg whitespace-nowrap transition-all duration-200 ${
-                    activeTab === tab.id
-                      ? 'bg-blue-600 text-white shadow-md'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                  }`}
+                  className={`tab-button ${activeTab === tab.id ? "active" : ""}`}
                 >
-                  <Icon className="w-4 h-4 mr-2" />
-                  <span className="hidden sm:inline">{tab.name}</span>
-                  <span className="sm:hidden">{tab.name.charAt(0)}</span>
+                  <Icon size={16} />
+                  <span>{tab.name}</span>
                 </button>
-              );
+              )
             })}
           </nav>
         </div>
 
-        {/* Error mejorado */}
+        {/* Error */}
         {error && (
-          <div className="mb-6 bg-red-50 border-l-4 border-red-400 rounded-lg p-6">
-            <div className="flex items-center">
-              <XCircle className="w-6 h-6 text-red-600 mr-3" />
+          <div className="alert alert-danger">
+            <div className="alert-header">
+              <div className="alert-icon" style={{ background: "rgba(239, 68, 68, 0.1)", color: "#ef4444" }}>
+                <XCircle size={24} />
+              </div>
               <div>
-                <h4 className="text-lg font-semibold text-red-800">Error de Conexión</h4>
-                <p className="mt-1 text-red-700">{error}</p>
+                <div className="alert-title">Error de Conexión</div>
+                <div className="alert-subtitle">{error}</div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Loading mejorado */}
+        {/* Loading */}
         {loading && (
-          <div className="flex flex-col items-center justify-center py-16">
-            <div className="relative">
-              <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-            </div>
-            <p className="mt-4 text-lg font-medium text-gray-600">Cargando datos...</p>
-            <p className="text-sm text-gray-500">Esto puede tomar unos segundos</p>
+          <div className="loading-container">
+            <div className="loading-spinner"></div>
+            <h3 className="loading-title">Cargando datos...</h3>
+            <p className="loading-subtitle">Esto puede tomar unos segundos</p>
           </div>
         )}
 
         {/* Content */}
         {!loading && (
-          <div className="transition-all duration-300">
-            {activeTab === 'dashboard' && <DashboardView />}
-            {activeTab === 'ventas' && <VentasView />}
-            {activeTab === 'productos' && <ProductosView />}
-            {activeTab === 'inventario' && <InventarioView />}
-            {activeTab === 'clientes' && <ClientesView />}
-            {activeTab === 'pedidos' && <PedidosView />}
-            {activeTab === 'categorias' && <CategoriasView />}
+          <div>
+            {activeTab === "dashboard" && <DashboardView />}
+            {activeTab === "ventas" && <VentasView />}
+            {activeTab === "productos" && <ProductosView />}
+            {activeTab === "inventario" && <InventarioView />}
+            {activeTab === "clientes" && <ClientesView />}
+            {activeTab === "pedidos" && <PedidosView />}
+            {activeTab === "categorias" && <CategoriasView />}
           </div>
         )}
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default AdminReportes;
+export default AdminReportes

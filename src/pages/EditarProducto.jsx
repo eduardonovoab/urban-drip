@@ -3,7 +3,7 @@ import axios from 'axios';
 import { ToastContainer, toast } from 'react-toastify';
 import { useNavigate, useParams } from 'react-router-dom';
 import 'react-toastify/dist/ReactToastify.css';
-import '../Styles/AgregarProducto.css';
+import '../Styles/EditarProducto.css';
 
 const EditarProducto = () => {
   const navigate = useNavigate();
@@ -17,7 +17,13 @@ const EditarProducto = () => {
     categoria_id: '',
     marca_id: '',
     precio_base: '',
-    tallas: [{ id_detalle_producto: null, talla_id: '', stock: '' }],
+    tallas: [{ 
+      id_detalle_producto: null, 
+      talla_id: '', 
+      stock_actual: 0,
+      stock_agregar: 0,
+      es_existente: false
+    }],
   };
 
   const [producto, setProducto] = useState(initialProductState);
@@ -28,14 +34,15 @@ const EditarProducto = () => {
   const [marcas, setMarcas] = useState([]);
   const [loading, setLoading] = useState(false);
   const [tallasEliminadas, setTallasEliminadas] = useState([]);
+  const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
+  const [datosConfirmacion, setDatosConfirmacion] = useState(null);
 
-  // Función para procesar datos del producto con detalles (similar a ListarProductos)
+  // Función para procesar datos del producto con detalles
   const procesarProductoConDetalles = (productosData) => {
     if (!Array.isArray(productosData) || productosData.length === 0) {
       throw new Error('No se encontraron datos del producto');
     }
 
-    // Tomar el primer elemento para datos básicos del producto
     const primerElemento = productosData[0];
     
     console.log('🔍 Procesando datos del producto:', {
@@ -44,7 +51,6 @@ const EditarProducto = () => {
       todosLosRegistros: productosData
     });
 
-    // Datos básicos del producto (común a todos los registros)
     const productoProcesado = {
       id_producto: primerElemento.id_producto,
       nombre: primerElemento.nombre_producto || '',
@@ -57,7 +63,6 @@ const EditarProducto = () => {
       detalles: []
     };
 
-    // Procesar cada detalle/variante
     productosData.forEach((registro, index) => {
       console.log(`📝 Procesando detalle ${index + 1}:`, {
         id_detalle: registro.id_detalle,
@@ -103,7 +108,6 @@ const EditarProducto = () => {
       try {
         console.log('🚀 Iniciando carga de datos para producto ID:', id);
 
-        // Cargar datos en paralelo
         const [categoriasRes, tallasRes, marcasRes, productoRes] = await Promise.all([
           axios.get('http://localhost:3000/api/admin/categorias', {
             headers: { Authorization: `Bearer ${token}` },
@@ -114,7 +118,6 @@ const EditarProducto = () => {
           axios.get('http://localhost:3000/api/admin/marcas', {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          // Usar la nueva ruta de edición
           axios.get(`http://localhost:3000/api/admin/producto/${id}/edicion`, {
             headers: { Authorization: `Bearer ${token}` },
           })
@@ -127,33 +130,25 @@ const EditarProducto = () => {
           producto: productoRes.data
         });
 
-        // Establecer datos en el estado
         setCategorias(categoriasRes.data || []);
         setTallas(tallasRes.data || []);
         setMarcas(marcasRes.data || []);
 
-        // Procesar datos del producto
         let productData;
         
-        // Si la respuesta es un array (como en ListarProductos)
         if (Array.isArray(productoRes.data)) {
           if (productoRes.data.length === 0) {
             throw new Error('Producto no encontrado');
           }
           productData = procesarProductoConDetalles(productoRes.data);
-        } 
-        // Si la respuesta es un objeto con estructura diferente
-        else if (productoRes.data && typeof productoRes.data === 'object') {
+        } else if (productoRes.data && typeof productoRes.data === 'object') {
           productData = productoRes.data;
           console.log('📋 Datos del producto (objeto):', productData);
-        }
-        else {
+        } else {
           throw new Error('Formato de respuesta no válido');
         }
 
-        // Configurar el estado del producto para edición
         if (productData.detalles && productData.detalles.length > 0) {
-          // Tomamos el primer detalle para marca y precio (asumiendo que es el mismo para todos)
           const primerDetalle = productData.detalles[0];
 
           console.log('🎯 Configurando producto con detalles:', {
@@ -173,14 +168,15 @@ const EditarProducto = () => {
             tallas: productData.detalles.map(detalle => ({
               id_detalle_producto: detalle.id_detalle_producto,
               talla_id: detalle.talla_id_talla ? String(detalle.talla_id_talla) : '',
-              stock: detalle.stock ? String(detalle.stock) : '',
+              stock_actual: parseInt(detalle.stock) || 0,
+              stock_agregar: 0,
+              es_existente: true,
               nombre_talla: detalle.nombre_talla || 'Sin talla',
               nombre_marca: detalle.nombre_marca || 'Sin marca'
             }))
           });
         } else {
           console.log('⚠️ Producto sin detalles, configurando valores por defecto');
-          // Producto sin detalles
           setProducto({
             nombre: productData.nombre || '',
             descripcion: productData.descripcion || '',
@@ -188,7 +184,14 @@ const EditarProducto = () => {
             categoria_id: productData.categoria_id || '',
             marca_id: '',
             precio_base: '',
-            tallas: [{ id_detalle_producto: null, talla_id: '', stock: '', nombre_talla: 'Sin talla' }]
+            tallas: [{ 
+              id_detalle_producto: null, 
+              talla_id: '', 
+              stock_actual: 0,
+              stock_agregar: 0,
+              es_existente: false,
+              nombre_talla: 'Sin talla' 
+            }]
           });
         }
 
@@ -238,7 +241,7 @@ const EditarProducto = () => {
     }
   };
 
-  // Manejar cambios en tallas
+  // Manejar cambios en tallas - MODIFICADO para nueva lógica
   const handleTallaChange = (index, e) => {
     const { name, value } = e.target;
     setProducto(prev => {
@@ -287,7 +290,13 @@ const EditarProducto = () => {
       ...prev,
       tallas: [
         ...prev.tallas,
-        { id_detalle_producto: null, talla_id: '', stock: '' }
+        { 
+          id_detalle_producto: null, 
+          talla_id: '', 
+          stock_actual: 0,
+          stock_agregar: 0,
+          es_existente: false
+        }
       ]
     }));
   };
@@ -318,7 +327,6 @@ const EditarProducto = () => {
           delete nuevosErrores[key];
         }
       });
-      // Reindexar errores de tallas posteriores
       Object.keys(nuevosErrores).forEach(key => {
         if (key.startsWith('talla_')) {
           const parts = key.split('_');
@@ -334,6 +342,13 @@ const EditarProducto = () => {
     });
   };
 
+  // Calcular stock total para una talla
+  const calcularStockTotal = (talla) => {
+    const stockActual = parseInt(talla.stock_actual) || 0;
+    const stockAgregar = parseInt(talla.stock_agregar) || 0;
+    return stockActual + stockAgregar;
+  };
+
   // Validar URL de imagen
   const validateImageUrl = (url) => {
     if (!url.trim()) return true;
@@ -341,7 +356,7 @@ const EditarProducto = () => {
     return urlRegex.test(url);
   };
 
-  // Validar formulario completo
+  // Validar formulario completo - MODIFICADO para nueva lógica
   const validarFormulario = () => {
     let valido = true;
     const nuevosErrores = {};
@@ -377,7 +392,7 @@ const EditarProducto = () => {
       valido = false;
     }
 
-    // Validar tallas
+    // Validar tallas - NUEVA LÓGICA
     const tallasUsadas = new Set();
     producto.tallas.forEach((talla, index) => {
       if (!talla.talla_id) {
@@ -390,10 +405,22 @@ const EditarProducto = () => {
         tallasUsadas.add(talla.talla_id);
       }
 
-      const stockValue = Number(talla.stock);
-      if (talla.stock === '' || isNaN(stockValue) || stockValue < 0) {
-        nuevosErrores[`talla_${index}_stock`] = 'El stock debe ser un número mayor o igual a 0';
-        valido = false;
+      // Para tallas nuevas, validar que tengan stock
+      if (!talla.es_existente) {
+        const stockAgregar = Number(talla.stock_agregar);
+        if (talla.stock_agregar === '' || isNaN(stockAgregar) || stockAgregar < 0) {
+          nuevosErrores[`talla_${index}_stock_agregar`] = 'El stock debe ser un número mayor o igual a 0';
+          valido = false;
+        }
+      } else {
+        // Para tallas existentes, validar stock a agregar si se especifica
+        if (talla.stock_agregar !== '' && talla.stock_agregar !== 0) {
+          const stockAgregar = Number(talla.stock_agregar);
+          if (isNaN(stockAgregar) || stockAgregar < 0) {
+            nuevosErrores[`talla_${index}_stock_agregar`] = 'El stock a agregar debe ser un número mayor o igual a 0';
+            valido = false;
+          }
+        }
       }
     });
 
@@ -401,7 +428,38 @@ const EditarProducto = () => {
     return valido;
   };
 
-  // Enviar formulario
+  // Mostrar alerta de confirmación
+  const prepararConfirmacion  = () => {
+    // Preparar información del resumen para mostrar en la confirmación
+    const tallasResumen = producto.tallas.map(talla => {
+      const nombreTalla = getNombreTalla(talla.talla_id);
+      if (talla.es_existente) {
+        const stockTotal = calcularStockTotal(talla);
+        const stockAgregar = parseInt(talla.stock_agregar) || 0;
+        return `• ${nombreTalla}: ${talla.stock_actual} → ${stockTotal} unidades${stockAgregar > 0 ? ` (+${stockAgregar})` : ''}`;
+      } else {
+        return `• ${nombreTalla}: ${talla.stock_agregar || 0} unidades (nueva)`;
+      }
+    }).join('\n');
+
+    const mensaje = `¿Estás seguro que quieres actualizar este producto?
+
+📦 Producto: ${producto.nombre}
+🏷️ Categoría: ${getNombreCategoria(producto.categoria_id)}
+🔖 Marca: ${getNombreMarca(producto.marca_id)}
+💰 Precio: ${producto.precio_base}
+
+📏 Tallas y Stock:
+${tallasResumen}
+
+Esta acción actualizará permanentemente la información del producto.`;
+
+    if (window.confirm(mensaje)) {
+      procesarActualizacion();
+    }
+  };
+
+  // Enviar formulario - MODIFICADO para nueva lógica
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -417,6 +475,12 @@ const EditarProducto = () => {
       return;
     }
 
+    // Mostrar confirmación antes de proceder
+    prepararConfirmacion();
+  };
+
+  // Función separada para procesar la actualización
+  const procesarActualizacion = async () => {
     setLoading(true);
 
     try {
@@ -435,7 +499,7 @@ const EditarProducto = () => {
       await axios.put(
         `http://localhost:3000/api/admin/producto/${id}/datos-basicos`,
         datosBasicos,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
 
       // PASO 2: Eliminar detalles marcados para eliminación
@@ -445,33 +509,50 @@ const EditarProducto = () => {
           tallasEliminadas.map(detalleId =>
             axios.delete(
               `http://localhost:3000/api/admin/producto-detalle/${detalleId}`,
-              { headers: { Authorization: `Bearer ${token}` } }
+              { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
             )
           )
         );
       }
 
-      // PASO 3: Procesar detalles existentes y nuevos
+      // PASO 3: Procesar detalles existentes y nuevos - NUEVA LÓGICA
       const detallesActualizados = [];
       const detallesNuevos = [];
 
       producto.tallas.forEach((talla) => {
-        const detalle = {
-          marca_id: parseInt(producto.marca_id),
-          talla_id: parseInt(talla.talla_id),
-          precio: parseFloat(producto.precio_base),
-          stock: parseInt(talla.stock),
-        };
-
-        if (talla.id_detalle_producto) {
-          detallesActualizados.push({
+        if (talla.es_existente) {
+          // Talla existente - calcular nuevo stock total
+          const stockTotal = calcularStockTotal(talla);
+          
+          const detalle = {
             id_detalle_producto: talla.id_detalle_producto,
-            ...detalle
+            marca_id: parseInt(producto.marca_id),
+            talla_id: parseInt(talla.talla_id),
+            precio: parseFloat(producto.precio_base),
+            stock: stockTotal, // Stock total (actual + agregado)
+          };
+          
+          detallesActualizados.push(detalle);
+          
+          console.log(`📊 Talla existente ${talla.nombre_talla}:`, {
+            stock_anterior: talla.stock_actual,
+            stock_agregar: talla.stock_agregar || 0,
+            stock_total: stockTotal
           });
         } else {
-          detallesNuevos.push({
+          // Talla nueva
+          const detalle = {
             producto_id: parseInt(id),
-            ...detalle
+            marca_id: parseInt(producto.marca_id),
+            talla_id: parseInt(talla.talla_id),
+            precio: parseFloat(producto.precio_base),
+            stock: parseInt(talla.stock_agregar) || 0,
+          };
+          
+          detallesNuevos.push(detalle);
+          
+          console.log(`➕ Talla nueva ${talla.nombre_talla}:`, {
+            stock_inicial: detalle.stock
           });
         }
       });
@@ -491,7 +572,7 @@ const EditarProducto = () => {
                 precio: detalle.precio,
                 stock: detalle.stock
               },
-              { headers: { Authorization: `Bearer ${token}` } }
+              { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
             )
           )
         );
@@ -504,7 +585,7 @@ const EditarProducto = () => {
             axios.post(
               `http://localhost:3000/api/admin/producto-detalle`,
               detalle,
-              { headers: { Authorization: `Bearer ${token}` } }
+              { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
             )
           )
         );
@@ -519,15 +600,18 @@ const EditarProducto = () => {
       await axios.post(
         `http://localhost:3000/api/admin/producto/${id}/actualizar-estados`,
         estadoActualizacion,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
 
       console.log('✅ Producto actualizado correctamente');
-      toast.success('Producto actualizado correctamente');
+      toast.success('¡Producto actualizado correctamente!', {
+        autoClose: 2000,
+        icon: '✅'
+      });
 
       setTimeout(() => {
         navigate('/admin/ListarProductos');
-      }, 2000);
+      }, 2500);
 
     } catch (error) {
       console.error('❌ Error al actualizar producto:', error);
@@ -549,7 +633,6 @@ const EditarProducto = () => {
 
     const tallasDisponibles = tallas.filter(talla => !tallasSeleccionadas.includes(talla.id_talla.toString()));
 
-    // Si hay una talla ya seleccionada en este índice, asegurar que esté disponible
     const tallaActual = producto.tallas[currentIndex];
     if (tallaActual?.talla_id && !tallasDisponibles.find(t => t.id_talla.toString() === tallaActual.talla_id)) {
       const tallaSeleccionada = tallas.find(t => t.id_talla.toString() === tallaActual.talla_id);
@@ -561,7 +644,7 @@ const EditarProducto = () => {
     return tallasDisponibles;
   };
 
-  // Función para obtener el nombre de la categoría
+  // Funciones auxiliares para nombres
   const getNombreCategoria = (categoriaId) => {
     if (!categoriaId) return 'Sin categoría';
     const categoria = categorias.find(cat =>
@@ -603,23 +686,6 @@ const EditarProducto = () => {
         <h2>Editar Producto</h2>
         <p className="subtitle">Modifica la información del producto</p>
       </div>
-
-      {/* Debug info - Remover en producción */}
-      {productoCargado && (
-        <div style={{ backgroundColor: '#f0f0f0', padding: '10px', margin: '10px 0', borderRadius: '5px' }}>
-          <strong>Datos cargados:</strong>
-          <div>Categoría: {getNombreCategoria(producto.categoria_id)} (ID: {producto.categoria_id || 'N/A'})</div>
-          <div>Marca: {getNombreMarca(producto.marca_id)} (ID: {producto.marca_id || 'N/A'})</div>
-          <div>Tallas:
-            {producto.tallas.map((t, i) => (
-              <div key={i}>
-                {i + 1}: {getNombreTalla(t.talla_id)} (ID: {t.talla_id || 'N/A'}, Stock: {t.stock || '0'})
-                {t.id_detalle_producto && ` - Detalle ID: ${t.id_detalle_producto}`}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       <form onSubmit={handleSubmit} className="form-agregar-producto" noValidate>
         {/* Información básica */}
@@ -747,7 +813,7 @@ const EditarProducto = () => {
           </div>
         </div>
 
-        {/* Sección de tallas */}
+        {/* Sección de tallas - NUEVA LÓGICA */}
         <div className="form-section">
           <div className="tallas-header">
             <h3>Tallas y Stock *</h3>
@@ -767,10 +833,9 @@ const EditarProducto = () => {
                 <div className="talla-header">
                   <h4>
                     Talla {index + 1}
-                    {talla.id_detalle_producto && (
+                    {talla.es_existente ? (
                       <span className="talla-badge existing">Existente</span>
-                    )}
-                    {!talla.id_detalle_producto && (
+                    ) : (
                       <span className="talla-badge new">Nueva</span>
                     )}
                   </h4>
@@ -808,21 +873,69 @@ const EditarProducto = () => {
                     )}
                   </div>
 
-                  <div className="form-group">
-                    <label>Stock *</label>
-                    <input
-                      type="number"
-                      name="stock"
-                      value={talla.stock}
-                      onChange={(e) => handleTallaChange(index, e)}
-                      placeholder="0"
-                      min="0"
-                      className={errores[`talla_${index}_stock`] ? 'error' : ''}
-                    />
-                    {errores[`talla_${index}_stock`] && (
-                      <p className="error-text">{errores[`talla_${index}_stock`]}</p>
-                    )}
-                  </div>
+                  {/* NUEVA LÓGICA DE STOCK */}
+                  {talla.es_existente ? (
+                    // Talla existente - mostrar stock actual como solo lectura
+                    <>
+                      <div className="form-group">
+                        <label>Stock Actual</label>
+                        <input
+                          type="number"
+                          value={talla.stock_actual}
+                          readOnly
+                          className="readonly-input"
+                          style={{
+                            backgroundColor: '#f8f9fa',
+                            color: '#6c757d',
+                            cursor: 'not-allowed'
+                          }}
+                        />
+                        <small className="help-text">Stock actual en el sistema</small>
+                      </div>
+
+                      <div className="form-group">
+                        <label>Agregar Stock</label>
+                        <input
+                          type="number"
+                          name="stock_agregar"
+                          value={talla.stock_agregar || ''}
+                          onChange={(e) => handleTallaChange(index, e)}
+                          placeholder="0"
+                          min="0"
+                          className={errores[`talla_${index}_stock_agregar`] ? 'error' : ''}
+                        />
+                        {errores[`talla_${index}_stock_agregar`] && (
+                          <p className="error-text">{errores[`talla_${index}_stock_agregar`]}</p>
+                        )}
+                        <small className="help-text">Stock a sumar al actual</small>
+                      </div>
+
+                      {/* Mostrar stock total calculado */}
+                      {(talla.stock_agregar && parseInt(talla.stock_agregar) > 0) && (
+                        <div className="stock-total-info">
+                          <strong>Stock Total: {calcularStockTotal(talla)} unidades</strong>
+                          <small>({talla.stock_actual} actual + {talla.stock_agregar} nuevo)</small>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    // Talla nueva - campo de stock normal
+                    <div className="form-group">
+                      <label>Stock Inicial *</label>
+                      <input
+                        type="number"
+                        name="stock_agregar"
+                        value={talla.stock_agregar || ''}
+                        onChange={(e) => handleTallaChange(index, e)}
+                        placeholder="0"
+                        min="0"
+                        className={errores[`talla_${index}_stock_agregar`] ? 'error' : ''}
+                      />
+                      {errores[`talla_${index}_stock_agregar`] && (
+                        <p className="error-text">{errores[`talla_${index}_stock_agregar`]}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -868,6 +981,113 @@ const EditarProducto = () => {
         pauseOnHover
         theme="light"
       />
+
+      {/* Modal de Confirmación Profesional */}
+      {mostrarConfirmacion && datosConfirmacion && (
+        <div className="custom-confirm-overlay" onClick={cerrarConfirmacion}>
+          <div className="custom-confirm-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="confirm-header">
+              <div className="confirm-icon">⚠️</div>
+              <h3 className="confirm-title">Confirmar Actualización</h3>
+            </div>
+
+            <div className="confirm-content">
+              <p className="confirm-question">
+                ¿Estás seguro que deseas actualizar este producto?
+              </p>
+
+              <div className="producto-resumen">
+                <div className="resumen-item">
+                  <span className="resumen-label">📦 Producto:</span>
+                  <span className="resumen-valor">{datosConfirmacion.nombre}</span>
+                </div>
+                <div className="resumen-item">
+                  <span className="resumen-label">🏷️ Categoría:</span>
+                  <span className="resumen-valor">{datosConfirmacion.categoria}</span>
+                </div>
+                <div className="resumen-item">
+                  <span className="resumen-label">🔖 Marca:</span>
+                  <span className="resumen-valor">{datosConfirmacion.marca}</span>
+                </div>
+                <div className="resumen-item">
+                  <span className="resumen-label">💰 Precio:</span>
+                  <span className="resumen-valor">${datosConfirmacion.precio}</span>
+                </div>
+              </div>
+
+              <div className="tallas-resumen">
+                <h4 className="tallas-titulo">
+                  📏 Tallas y Stock ({datosConfirmacion.totalTallas} tallas)
+                </h4>
+                
+                {datosConfirmacion.tallasNuevas > 0 && (
+                  <div className="estadistica">
+                    <span className="badge-nueva">{datosConfirmacion.tallasNuevas} nueva(s)</span>
+                  </div>
+                )}
+                
+                {datosConfirmacion.tallasModificadas > 0 && (
+                  <div className="estadistica">
+                    <span className="badge-modificada">{datosConfirmacion.tallasModificadas} modificada(s)</span>
+                  </div>
+                )}
+
+                <div className="tallas-lista">
+                  {datosConfirmacion.tallas.map((talla, index) => (
+                    <div key={index} className={`talla-item ${talla.tipo}`}>
+                      <span className="talla-nombre">{talla.nombre}</span>
+                      {talla.tipo === 'existente' ? (
+                        <span className="talla-stock">
+                          {talla.stockAnterior} → {talla.stockNuevo} unidades
+                          {talla.stockAgregado > 0 && (
+                            <span className="stock-agregado"> (+{talla.stockAgregado})</span>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="talla-stock">
+                          {talla.stockInicial} unidades
+                          <span className="talla-nueva-badge">nueva</span>
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="advertencia">
+                <div className="advertencia-icon">ℹ️</div>
+                <span>Esta acción actualizará permanentemente la información del producto en el sistema.</span>
+              </div>
+            </div>
+
+            <div className="confirm-actions">
+              <button
+                type="button"
+                onClick={cerrarConfirmacion}
+                className="btn-confirm-cancel"
+                disabled={loading}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmarActualizacion}
+                className={`btn-confirm-accept ${loading ? 'loading' : ''}`}
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <span className="spinner-small"></span>
+                    Actualizando...
+                  </>
+                ) : (
+                  'Sí, Actualizar'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

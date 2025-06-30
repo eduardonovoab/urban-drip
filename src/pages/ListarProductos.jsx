@@ -384,20 +384,6 @@ const ListarProductos = () => {
                     >
                       Modificar
                     </button>
-                    
-                    {/* Dropdown para cambiar estado */}
-                    <select
-                      value={producto.estado_id}
-                      onChange={(e) => handleCambiarEstado(producto.id_producto, parseInt(e.target.value))}
-                      className={`btn-estado estado-${producto.estado_id}`}
-                      title="Cambiar estado del producto"
-                    >
-                      {estadosProducto.map(estado => (
-                        <option key={estado.id_estado} value={estado.id_estado}>
-                          {estado.nombre_estado}
-                        </option>
-                      ))}
-                    </select>
                   </div>
                 </div>
                 
