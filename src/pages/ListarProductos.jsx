@@ -42,20 +42,15 @@ const ListarProductos = () => {
           })
         ]);
 
-        console.log('✅ Datos recibidos:', {
-          productos: productosRes.data,
-          categorias: categoriasRes.data,
-          estados: estadosRes.data
-        });
-
-        // Agrupar productos por id_producto
-        const productosAgrupados = agruparProductosPorId(productosRes.data);
+        const productosOriginales = productosRes.data;
+        const productosAgrupados = agruparProductosPorId(productosOriginales);
+        
         setProductos(productosAgrupados);
         setCategorias(categoriasRes.data);
         setEstadosProducto(estadosRes.data);
 
       } catch (error) {
-        console.error('❌ Error al cargar datos:', error);
+        console.error('Error al cargar datos:', error);
         
         if (error.response?.status === 401 || error.response?.status === 403) {
           localStorage.removeItem('token');
@@ -72,6 +67,64 @@ const ListarProductos = () => {
     fetchData();
   }, [navigate]);
 
+  // Función para recargar los productos después de un cambio
+  const recargarProductos = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      const productosRes = await axios.get('http://localhost:3000/api/admin/productos', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      const productosAgrupados = agruparProductosPorId(productosRes.data);
+      setProductos(productosAgrupados);
+    } catch (error) {
+      console.error('Error al recargar productos:', error);
+    }
+  };
+
+  // Determinar estado del producto basado en todas sus variantes
+  const determinarEstadoProducto = (detalles) => {
+    if (!detalles || detalles.length === 0) {
+      return { id_estado: 1, nombre_estado: 'Disponible' };
+    }
+
+    // Analizar estados de variantes con corrección automática por stock
+    const estadosVariantes = detalles.map(detalle => {
+      const estadoOriginal = parseInt(detalle.id_estado) || 1;
+      const stock = parseInt(detalle.stock) || 0;
+      
+      // Corrección: Si stock es 0, forzar estado agotado
+      if (stock === 0 && estadoOriginal === 1) {
+        return 2; // Agotado
+      }
+      
+      return estadoOriginal;
+    });
+
+    // Contar estados corregidos
+    const disponibles = estadosVariantes.filter(e => e === 1).length;
+    const agotados = estadosVariantes.filter(e => e === 2).length;
+    const descontinuados = estadosVariantes.filter(e => e === 3).length;
+
+    // Lógica de determinación de estado
+    if (disponibles > 0) {
+      return { id_estado: 1, nombre_estado: 'Disponible' };
+    }
+    
+    if (agotados > 0) {
+      return { id_estado: 2, nombre_estado: 'Agotado' };
+    }
+    
+    if (descontinuados > 0) {
+      return { id_estado: 3, nombre_estado: 'Descontinuado' };
+    }
+
+    return { id_estado: 1, nombre_estado: 'Disponible' };
+  };
+
+  // Agrupar productos manteniendo estados reales
   const agruparProductosPorId = (productos) => {
     const productosMap = new Map();
     
@@ -79,32 +132,43 @@ const ListarProductos = () => {
       const idProducto = producto.id_producto;
       
       if (!productosMap.has(idProducto)) {
-        // Crear entrada principal del producto
         productosMap.set(idProducto, {
           id_producto: producto.id_producto,
           nombre_producto: producto.nombre_producto,
           descripcion: producto.descripcion,
           imagen_url: producto.imagen_url,
           nombre_categoria: producto.nombre_categoria,
-          estado_id: producto.estado_id,
-          nombre_estado: producto.nombre_estado,
-          detalles: [] // Array para almacenar las variantes (talla/marca/precio)
+          detalles: []
         });
       }
       
-      // Agregar detalle de variante
+      // Agregar detalle de variante con estado original
       const productoExistente = productosMap.get(idProducto);
-      productoExistente.detalles.push({
+      const estadoVariante = {
         id_detalle: producto.id_detalle,
-        nombre_marca: producto.nombre_marca,
-        nombre_talla: producto.nombre_talla,
-        precio: producto.precio,
-        stock: producto.stock,
-        estado_detalle: producto.estado_detalle || producto.estado
-      });
+        nombre_marca: producto.nombre_marca || 'Sin marca',
+        nombre_talla: producto.nombre_talla || 'Sin talla',
+        precio: parseFloat(producto.precio) || 0,
+        stock: parseInt(producto.stock) || 0,
+        id_estado: parseInt(producto.id_estado) || 1,
+        nombre_estado: producto.nombre_estado || 'Disponible'
+      };
+      
+      productoExistente.detalles.push(estadoVariante);
     });
     
-    return Array.from(productosMap.values());
+    // Determinar el estado del producto basado en todas sus variantes
+    const productosFinales = Array.from(productosMap.values()).map(producto => {
+      const estadoProducto = determinarEstadoProducto(producto.detalles);
+      
+      return {
+        ...producto,
+        id_estado: estadoProducto.id_estado,
+        nombre_estado: estadoProducto.nombre_estado
+      };
+    });
+    
+    return productosFinales;
   };
 
   const toggleExpandirProducto = (id) => {
@@ -118,54 +182,13 @@ const ListarProductos = () => {
     navigate(`/admin/editar/${id}`);
   };
 
-  const handleCambiarEstado = async (id, nuevoEstadoId) => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      toast.error('No estás autenticado.');
-      return;
-    }
-
-    // Encontrar el nombre del estado
-    const estadoSeleccionado = estadosProducto.find(e => e.id_estado === nuevoEstadoId);
-    if (!estadoSeleccionado) {
-      toast.error('Estado no válido');
-      return;
-    }
-
-    try {
-      await axios.put(
-        `http://localhost:3000/api/admin/producto/${id}`,
-        { estado_id: nuevoEstadoId },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      setProductos((prevProductos) =>
-        prevProductos.map((prod) =>
-          prod.id_producto === id ? { 
-            ...prod, 
-            estado_id: nuevoEstadoId,
-            nombre_estado: estadoSeleccionado.nombre_estado
-          } : prod
-        )
-      );
-
-      toast.success(`Producto cambiado a "${estadoSeleccionado.nombre_estado}" correctamente`);
-    } catch (error) {
-      console.error('❌ Error al cambiar estado del producto:', error);
-      
-      const errorMessage = error.response?.data?.error || 
-                          error.response?.data?.message || 
-                          'Error al cambiar estado del producto';
-      toast.error(errorMessage);
-    }
-  };
-
-  // Calcular estadísticas
+  // Calcular estadísticas con estados reales
   const calcularEstadisticas = () => {
     const totalProductos = productos.length;
-    const productosDisponibles = productos.filter(p => p.estado_id === 1).length;
-    const productosAgotados = productos.filter(p => p.estado_id === 2).length;
-    const productosDescontinuados = productos.filter(p => p.estado_id === 3).length;
+    
+    const productosDisponibles = productos.filter(p => p.id_estado === 1).length;
+    const productosAgotados = productos.filter(p => p.id_estado === 2).length;
+    const productosDescontinuados = productos.filter(p => p.id_estado === 3).length;
     
     // Calcular stock total y stock bajo
     let stockTotal = 0;
@@ -173,8 +196,8 @@ const ListarProductos = () => {
     
     productos.forEach(producto => {
       producto.detalles.forEach(detalle => {
-        stockTotal += detalle.stock;
-        if (detalle.stock < 10) {
+        stockTotal += detalle.stock || 0;
+        if ((detalle.stock || 0) < 10) {
           stockBajo++;
         }
       });
@@ -190,18 +213,22 @@ const ListarProductos = () => {
     };
   };
 
-  // Filtrar productos
+  // Filtro de productos
   const productosFiltrados = productos.filter(producto => {
+    // Filtro de búsqueda
     const coincideBusqueda = busqueda === '' || 
       producto.nombre_producto.toLowerCase().includes(busqueda.toLowerCase()) ||
       producto.detalles.some(detalle => 
         detalle.nombre_marca.toLowerCase().includes(busqueda.toLowerCase())
       );
     
+    // Filtro de categoría
     const coinciadeCategoria = filtroCategoria === '' || 
       producto.nombre_categoria === filtroCategoria;
     
-    const coinciadeEstado = filtroEstado === '' || producto.estado_id.toString() === filtroEstado;
+    // Filtro de estado
+    const coinciadeEstado = filtroEstado === '' || 
+      producto.id_estado === parseInt(filtroEstado);
     
     return coincideBusqueda && coinciadeCategoria && coinciadeEstado;
   });
@@ -235,21 +262,23 @@ const ListarProductos = () => {
             <h1 className="title">Panel de Administración</h1>
             <p className="subtitle">Gestiona tu inventario de productos</p>
           </div>
-          <div className="vista-toggle">
-            <button
-              onClick={() => setVistaGrid(true)}
-              className={vistaGrid ? 'active' : ''}
-              title="Vista en cuadrícula"
-            >
-              <Grid className="icon" />
-            </button>
-            <button
-              onClick={() => setVistaGrid(false)}
-              className={!vistaGrid ? 'active' : ''}
-              title="Vista en lista"
-            >
-              <List className="icon" />
-            </button>
+          <div className="header-actions">
+            <div className="vista-toggle">
+              <button
+                onClick={() => setVistaGrid(true)}
+                className={vistaGrid ? 'active' : ''}
+                title="Vista en cuadrícula"
+              >
+                <Grid className="icon" />
+              </button>
+              <button
+                onClick={() => setVistaGrid(false)}
+                className={!vistaGrid ? 'active' : ''}
+                title="Vista en lista"
+              >
+                <List className="icon" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -345,7 +374,7 @@ const ListarProductos = () => {
                     e.target.src = 'https://via.placeholder.com/400x400?text=Sin+Imagen';
                   }}
                 />
-                <div className={`estado-badge estado-${producto.estado_id}`}>
+                <div className={`estado-badge estado-${producto.id_estado}`}>
                   {producto.nombre_estado}
                 </div>
               </div>
@@ -400,6 +429,9 @@ const ListarProductos = () => {
                             <span className="precio">${detalle.precio}</span>
                             <span className={`stock ${detalle.stock < 10 ? 'low' : ''}`}>
                               Stock: {detalle.stock}
+                            </span>
+                            <span className={`estado estado-${detalle.id_estado}`}>
+                              {detalle.nombre_estado}
                             </span>
                           </div>
                         </div>

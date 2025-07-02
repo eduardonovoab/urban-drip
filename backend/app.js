@@ -13,6 +13,12 @@ import productoRoutes from './routes/producto.js';
 import usuarioRoutes from './routes/usuarioRoutes.js'
 import reportesRoutes from './routes/reportesRoutes.js';
 
+// ===============================================
+// NUEVOS IMPORTS PARA ESTADOS
+// ===============================================
+import { actualizarEstadosMiddleware } from './middleware/estadosMiddleware.js';
+import { configurarCronEstados } from './utils/estadosAutomaticos.js';
+
 dotenv.config();
 
 const app = express();
@@ -33,6 +39,13 @@ app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
   next();
 });
+
+// ===============================================
+// MIDDLEWARE DE ESTADOS (AGREGAR DESPUÉS DEL LOGGING)
+// ===============================================
+console.log('🔧 Configurando middleware de estados...');
+app.use(actualizarEstadosMiddleware);
+console.log('✅ Middleware de estados configurado');
 
 // Health check principal
 app.get('/', (req, res) => {
@@ -88,19 +101,21 @@ try {
 } catch (error) {
   console.error('❌ Error montando rutas públicas:', error.message);
 }
+
 try {
   app.use('/api/usuario', usuarioRoutes);
-  console.log('✅ Rutas de productos montadas');
+  console.log('✅ Rutas de usuario montadas');
 } catch (error) {
-  console.error('❌ Error montando rutas de productos:', error.message);
+  console.error('❌ Error montando rutas de usuario:', error.message);
 }
-reportesRoutes
+
 try {
   app.use('/api/reportes', reportesRoutes);
-  console.log('✅ Rutas de productos montadas');
+  console.log('✅ Rutas de reportes montadas');
 } catch (error) {
-  console.error('❌ Error montando rutas de productos:', error.message);
+  console.error('❌ Error montando rutas de reportes:', error.message);
 }
+
 try {
   app.use('/api/productos', productoRoutes);
   console.log('✅ Rutas de productos montadas');
@@ -108,6 +123,19 @@ try {
   console.error('❌ Error montando rutas de productos:', error.message);
 }
 
-console.log('🎯 Todas las rutas procesadas')
+console.log('🎯 Todas las rutas procesadas');
+
+// ===============================================
+// CONFIGURAR CRON DE ESTADOS (AL FINAL)
+// ===============================================
+console.log('🔧 Configurando sistema de estados automatizado...');
+try {
+  configurarCronEstados();
+  console.log('✅ Sistema de estados automatizado configurado');
+} catch (error) {
+  console.error('❌ Error configurando CRON de estados:', error.message);
+}
+
+console.log('🚀 Aplicación configurada con sistema de estados automatizado');
 
 export default app;

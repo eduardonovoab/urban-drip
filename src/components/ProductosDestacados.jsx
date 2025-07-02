@@ -35,7 +35,10 @@ const ProductosDestacados = () => {
     const cargarProductos = async () => {
       try {
         setLoading(true);
-        const response = await fetch('http://localhost:3000/api/productos/productos-detalles');
+        
+        // Usar endpoint que filtra productos activos (disponibles y agotados)
+        // Si tienes el endpoint /productos/destacados/activos, úsalo, sino usa /productos/productos-detalles
+        const response = await fetch('http://localhost:3000/api/productos/destacados/activos');
         
         if (!response.ok) {
           throw new Error(`Error HTTP: ${response.status}`);
@@ -70,10 +73,11 @@ const ProductosDestacados = () => {
         
         console.log('Primer producto de ejemplo:', productosArray[0]);
         
-        const productosProcessados = procesarProductos(productosArray);
-        const productosFiltrados = filtrarPorCategoria(productosProcessados);
+        // Procesar productos con manejo de estados activos
+        const productosProcessados = procesarProductosConEstados(productosArray);
+        const productosFiltrados = filtrarPorCategoria(productosProcessados, 2); // 2 por categoría
         
-        console.log('Productos procesados:', productosFiltrados);
+        console.log('Productos procesados y filtrados:', productosFiltrados);
         setProductos(productosFiltrados);
       } catch (err) {
         console.error('Error al cargar productos:', err);
@@ -86,77 +90,100 @@ const ProductosDestacados = () => {
     cargarProductos();
   }, []);
 
-  // Función para procesar productos con la nueva estructura de API
-  const procesarProductos = (productosRaw) => {
+  // Función para procesar productos con manejo de estados activos
+  const procesarProductosConEstados = (productosRaw) => {
     if (!Array.isArray(productosRaw)) {
-      console.error('procesarProductos recibió datos que no son un array:', productosRaw);
+      console.error('procesarProductosConEstados recibió datos que no son un array:', productosRaw);
       return [];
     }
 
     return productosRaw.map(producto => {
       // Verificar que el producto tenga la estructura esperada
-      if (!producto || !producto.id_producto || !Array.isArray(producto.detalles) || producto.detalles.length === 0) {
+      if (!producto || !producto.id_producto) {
         console.warn('Producto inválido encontrado:', producto);
         return null;
       }
 
-      console.log('Procesando producto:', producto.nombre_producto, 'con', producto.detalles.length, 'detalles');
+      console.log('Procesando producto:', producto.nombre_producto);
 
-      // Obtener información del primer detalle para datos básicos
-      const primerDetalle = producto.detalles[0];
+      // Si tiene estructura de detalles (como el endpoint productos-detalles)
+      let precio_minimo, precio_maximo, stock_total, nombre_marca, detalles;
       
-      // Calcular precios mínimo y máximo
-      const precios = producto.detalles
-        .map(detalle => parseFloat(detalle.precio))
-        .filter(precio => !isNaN(precio) && precio > 0);
+      if (Array.isArray(producto.detalles) && producto.detalles.length > 0) {
+        // Estructura con detalles
+        detalles = producto.detalles;
+        const precios = detalles
+          .map(detalle => parseFloat(detalle.precio))
+          .filter(precio => !isNaN(precio) && precio > 0);
+        
+        precio_minimo = precios.length > 0 ? Math.min(...precios) : 0;
+        precio_maximo = precios.length > 0 ? Math.max(...precios) : 0;
+        stock_total = detalles.reduce((total, detalle) => total + (parseInt(detalle.stock) || 0), 0);
+        nombre_marca = detalles[0]?.marca?.nombre_marca || 'Sin marca';
+      } else {
+        // Estructura simple
+        precio_minimo = parseFloat(producto.precio || producto.precio_minimo || 0);
+        precio_maximo = parseFloat(producto.precio || producto.precio_maximo || precio_minimo);
+        stock_total = parseInt(producto.stock || producto.stock_total || 0);
+        nombre_marca = producto.nombre_marca || producto.marca?.nombre_marca || 'Sin marca';
+        detalles = [];
+      }
+
+      // Determinar estado del producto
+      let estadoFinal = 'disponible';
+      let disponible = true;
+
+      // Verificar si el producto tiene estado definido
+      const estadoProducto = producto.estado_producto || producto.estado || '';
       
-      const precio_minimo = precios.length > 0 ? Math.min(...precios) : 0;
-      const precio_maximo = precios.length > 0 ? Math.max(...precios) : 0;
-
-      // Calcular stock total
-      const stock_total = producto.detalles
-        .reduce((total, detalle) => total + (parseInt(detalle.stock) || 0), 0);
-
-      // Obtener todas las tallas
-      const tallas = producto.detalles
-        .map(detalle => detalle.talla?.nombre_talla || 'Única')
-        .filter((talla, index, array) => array.indexOf(talla) === index); // Eliminar duplicados
-
-      // Obtener la marca del primer detalle
-      const nombre_marca = primerDetalle.marca?.nombre_marca || 'Sin marca';
-
-      // Obtener la categoría
-      const nombre_categoria = producto.categoria?.nombre_categoria || 'Sin categoría';
+      if (estadoProducto.toLowerCase() === 'inhabilitado') {
+        // Filtrar productos inhabilitados - no los incluimos
+        return null;
+      } else if (stock_total === 0 || estadoProducto.toLowerCase() === 'agotado') {
+        estadoFinal = 'agotado';
+        disponible = false;
+      } else if (stock_total > 0) {
+        estadoFinal = 'disponible';
+        disponible = true;
+      }
 
       const productoProcessado = {
         id_producto: producto.id_producto,
         nombre_producto: producto.nombre_producto || 'Producto sin nombre',
         descripcion: producto.descripcion || '',
         imagen_url: producto.imagen_url || 'https://via.placeholder.com/300x300?text=Sin+Imagen',
-        nombre_categoria: nombre_categoria,
+        nombre_categoria: producto.categoria?.nombre_categoria || producto.nombre_categoria || 'Sin categoría',
         nombre_marca: nombre_marca,
         precio_minimo: precio_minimo,
         precio_maximo: precio_maximo,
         stock_total: stock_total,
-        tallas: tallas,
-        detalles: producto.detalles
+        detalles: detalles,
+        
+        // Estados calculados
+        estado: estadoFinal,
+        disponible: disponible,
+        tiene_stock: stock_total > 0,
+        
+        // Tallas disponibles
+        tallas: detalles.length > 0 
+          ? detalles.map(d => d.talla?.nombre_talla || 'Única').filter((t, i, arr) => arr.indexOf(t) === i)
+          : ['Única']
       };
 
       console.log('Producto procesado:', {
         id: productoProcessado.id_producto,
         nombre: productoProcessado.nombre_producto,
-        marca: productoProcessado.nombre_marca,
-        precio_min: productoProcessado.precio_minimo,
-        precio_max: productoProcessado.precio_maximo,
+        estado: productoProcessado.estado,
+        disponible: productoProcessado.disponible,
         stock: productoProcessado.stock_total
       });
 
       return productoProcessado;
-    }).filter(producto => producto !== null); // Filtrar productos nulos
+    }).filter(producto => producto !== null); // Filtrar productos nulos (inhabilitados)
   };
 
-  // Función para filtrar productos por categoría
-  const filtrarPorCategoria = (productos, limitePorCategoria = 3) => {
+  // Función para filtrar productos por categoría (manteniendo tu lógica original)
+  const filtrarPorCategoria = (productos, limitePorCategoria = 2) => {
     if (!Array.isArray(productos)) {
       console.error('filtrarPorCategoria recibió datos que no son un array:', productos);
       return [];
@@ -164,7 +191,12 @@ const ProductosDestacados = () => {
 
     const grupos = {};
 
-    productos.forEach(prod => {
+    // Separar productos disponibles y agotados
+    const productosDisponibles = productos.filter(p => p.disponible);
+    const productosAgotados = productos.filter(p => !p.disponible);
+
+    // Priorizar productos disponibles por categoría
+    productosDisponibles.forEach(prod => {
       const categoria = prod.nombre_categoria || 'Sin categoría';
       
       if (!grupos[categoria]) {
@@ -175,7 +207,22 @@ const ProductosDestacados = () => {
       }
     });
 
-    return Object.values(grupos).flat();
+    // Completar con productos agotados si hay espacio en las categorías
+    productosAgotados.forEach(prod => {
+      const categoria = prod.nombre_categoria || 'Sin categoría';
+      
+      if (!grupos[categoria]) {
+        grupos[categoria] = [];
+      }
+      if (grupos[categoria].length < limitePorCategoria) {
+        grupos[categoria].push(prod);
+      }
+    });
+
+    const resultado = Object.values(grupos).flat();
+    console.log(`Productos filtrados por categoría (${limitePorCategoria} por categoría):`, resultado.length);
+    
+    return resultado;
   };
 
   // Navegación del carousel
@@ -222,6 +269,34 @@ const ProductosDestacados = () => {
       return 'Precio no disponible';
     }
     return `$ ${precioNum.toLocaleString('es-CL')}`;
+  };
+
+  // Función para obtener información de disponibilidad
+  const obtenerInfoDisponibilidad = (producto) => {
+    if (!producto.disponible) {
+      return {
+        disponible: false,
+        texto: 'Agotado',
+        clase: 'agotado',
+        showBadge: true
+      };
+    }
+    
+    if (producto.stock_total <= 5) {
+      return {
+        disponible: true,
+        texto: `¡Últimas ${producto.stock_total} unidades!`,
+        clase: 'stock-bajo',
+        showBadge: false
+      };
+    }
+    
+    return {
+      disponible: true,
+      texto: 'Disponible',
+      clase: 'disponible',
+      showBadge: false
+    };
   };
 
   // Estados de carga y error
@@ -321,11 +396,13 @@ const ProductosDestacados = () => {
               }}
             >
               {productos.map((producto) => {
+                const infoDisponibilidad = obtenerInfoDisponibilidad(producto);
+                
                 return (
                   <Link
                     key={producto.id_producto}
                     to={`/producto/detalle/${producto.id_producto}`}
-                    className="product-card"
+                    className={`product-card ${!infoDisponibilidad.disponible ? 'agotado' : ''}`}
                     style={{ 
                       flex: `0 0 ${100 / productos.length}%`,
                       textDecoration: 'none',
@@ -334,6 +411,11 @@ const ProductosDestacados = () => {
                   >
                     {/* Imagen del producto */}
                     <div className="product-image-container">
+                      {/* Badge de agotado */}
+                      {infoDisponibilidad.showBadge && (
+                        <div className="badge-agotado">Agotado</div>
+                      )}
+                      
                       <img
                         src={producto.imagen_url}
                         alt={producto.nombre_producto}
@@ -342,6 +424,7 @@ const ProductosDestacados = () => {
                           e.target.src = 'https://via.placeholder.com/300x300?text=Sin+Imagen';
                         }}
                       />
+                      
                       {/* Badge de stock bajo */}
                       {producto.stock_total <= 5 && producto.stock_total > 0 && (
                         <div className="stock-badge">
@@ -360,7 +443,7 @@ const ProductosDestacados = () => {
                       </div>
                       
                       {/* Precio */}
-                      <div className="product-price">
+                      <div className={`product-price ${!infoDisponibilidad.disponible ? 'agotado' : ''}`}>
                         {producto.precio_minimo === producto.precio_maximo ? (
                           <span className="price-main">
                             {formatearPrecio(producto.precio_minimo)}
@@ -379,15 +462,9 @@ const ProductosDestacados = () => {
                         </div>
                       )}
                       
-                      {/* Stock */}
-                      <div className="product-stock">
-                        {producto.stock_total > 0 ? (
-                          <small className="in-stock">
-                            Stock disponible: {producto.stock_total}
-                          </small>
-                        ) : (
-                          <small className="out-of-stock">Sin stock</small>
-                        )}
+                      {/* Estado de disponibilidad */}
+                      <div className={`product-availability ${infoDisponibilidad.clase}`}>
+                        <small>{infoDisponibilidad.texto}</small>
                       </div>
                     </div>
                   </Link>

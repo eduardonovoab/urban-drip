@@ -1,4 +1,4 @@
-/* ===== PRODUCTOS POR CATEGORÍA - ESTILOS PROFESIONALES ===== */
+/* ===== PRODUCTOS POR CATEGORÍA - ESTILOS MEJORADOS CON AGOTADOS ===== */
 
 /* Container principal */
 .productos-container {
@@ -9,7 +9,7 @@
   min-height: 100vh;
 }
 
-/* Header de categoría */
+/* Header de categoría MEJORADO */
 .categoria-header {
   background: white;
   padding: 32px;
@@ -53,11 +53,43 @@
   text-decoration: none;
 }
 
+/* NUEVOS ESTILOS: Estadísticas de categoría */
+.categoria-stats {
+  margin-top: 16px;
+}
+
 .productos-count {
   color: #718096;
   font-size: 1.1rem;
   font-weight: 500;
-  margin: 8px 0 0 0;
+  margin: 0 0 8px 0;
+}
+
+.stats-breakdown {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.stat-disponibles {
+  background: #f0fff4;
+  color: #38a169;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border: 1px solid #c6f6d5;
+}
+
+.stat-agotados {
+  background: #fef5e7;
+  color: #ed8936;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border: 1px solid #fbd38d;
 }
 
 /* Grid de productos - Responsive */
@@ -67,7 +99,6 @@
   margin-bottom: 40px;
 }
 
-/* Grid responsive: 4 columnas en desktop, 3 en tablet, 2 en móvil, 1 en móvil pequeño */
 @media (min-width: 1200px) {
   .productos-grid {
     grid-template-columns: repeat(4, 1fr);
@@ -94,7 +125,7 @@
   }
 }
 
-/* Tarjeta de producto */
+/* Tarjeta de producto BASE */
 .producto-card {
   background: white;
   border-radius: 16px;
@@ -105,6 +136,7 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  position: relative;
 }
 
 .producto-card:hover {
@@ -119,6 +151,41 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+}
+
+/* ESTILOS ESPECÍFICOS: Producto disponible */
+.producto-card.producto-disponible {
+  border-color: #c6f6d5;
+}
+
+.producto-card.producto-disponible:hover {
+  border-color: #38a169;
+  box-shadow: 0 12px 40px rgba(56, 161, 105, 0.2);
+}
+
+/* ESTILOS ESPECÍFICOS: Producto agotado */
+.producto-card.producto-agotado {
+  border-color: #fbd38d;
+  background: #fffbf5;
+  position: relative;
+}
+
+.producto-card.producto-agotado:hover {
+  border-color: #ed8936;
+  box-shadow: 0 12px 40px rgba(237, 137, 54, 0.2);
+  transform: translateY(-4px); /* Menos elevación para agotados */
+}
+
+.producto-card.producto-agotado::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.05);
+  pointer-events: none;
+  z-index: 1;
 }
 
 /* Imagen del producto */
@@ -140,7 +207,50 @@
   transform: scale(1.05);
 }
 
-/* Badge de variantes */
+/* ESPECÍFICO AGOTADOS: Imagen con filtro */
+.producto-card.producto-agotado .producto-imagen img {
+  filter: grayscale(20%) brightness(0.9);
+}
+
+.producto-card.producto-agotado:hover .producto-imagen img {
+  filter: grayscale(10%) brightness(0.95);
+  transform: scale(1.02); /* Menos zoom para agotados */
+}
+
+/* NUEVOS BADGES: Estado agotado prominente */
+.estado-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+  z-index: 2;
+}
+
+.agotado-badge {
+  background: linear-gradient(135deg, #ed8936, #dd6b20);
+  color: white;
+  animation: pulseAgotado 2s infinite;
+}
+
+@keyframes pulseAgotado {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.05); opacity: 0.9; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.agotado-text {
+  font-weight: 800;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Badge de variantes (ajustado para no chocar) */
 .variantes-badge {
   position: absolute;
   top: 12px;
@@ -153,6 +263,28 @@
   font-weight: 600;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   backdrop-filter: blur(10px);
+  z-index: 2;
+}
+
+/* NUEVO: Badge de stock bajo */
+.stock-bajo-badge {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  background: linear-gradient(135deg, #f56565, #e53e3e);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  z-index: 2;
+  animation: bounce 1s infinite alternate;
+}
+
+@keyframes bounce {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-2px); }
 }
 
 /* Información del producto */
@@ -174,6 +306,11 @@
   line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* ESPECÍFICO AGOTADOS: Nombre con estilo especial */
+.producto-card.producto-agotado .producto-nombre {
+  color: #744210;
 }
 
 .producto-descripcion {
@@ -198,6 +335,27 @@
   margin: 0 0 16px 0;
 }
 
+/* ESPECÍFICO AGOTADOS: Precio con estilo diferente */
+.precio-agotado {
+  background: linear-gradient(135deg, #ed8936, #dd6b20) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  position: relative;
+}
+
+.precio-agotado::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #ed8936;
+  transform: translateY(-50%);
+  opacity: 0.6;
+}
+
 /* Información extra del producto */
 .producto-extras {
   margin-top: auto;
@@ -213,18 +371,43 @@
   gap: 6px;
 }
 
+/* Estados de stock MEJORADOS */
 .producto-stock {
   font-weight: 600;
-  color: #48bb78;
-  background: #f0fff4;
   padding: 4px 8px;
   border-radius: 6px;
   font-size: 0.8rem;
 }
 
-.producto-stock.sin-stock {
+.producto-stock.stock-ok {
+  color: #48bb78;
+  background: #f0fff4;
+}
+
+.producto-stock.stock-medio {
+  color: #ed8936;
+  background: #fef5e7;
+}
+
+.producto-stock.stock-bajo {
   color: #e53e3e;
   background: #fed7d7;
+  font-weight: 700;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
+.producto-stock.agotado {
+  color: #ed8936;
+  background: #fef5e7;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .producto-variantes {
@@ -244,46 +427,78 @@
   border-radius: 6px;
 }
 
-/* Acciones del producto */
+/* Acciones del producto MEJORADAS */
 .producto-actions {
   padding: 16px 20px;
   background: #f7fafc;
   border-top: 1px solid #e2e8f0;
 }
 
+/* Botón base */
 .btn-ver-detalles {
   display: block;
   width: 100%;
   padding: 12px 16px;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  color: white;
   text-decoration: none;
   border-radius: 10px;
   text-align: center;
   font-weight: 600;
   font-size: 0.95rem;
   transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
-.btn-ver-detalles:hover {
-  background: linear-gradient(135deg, #5a67d8, #6b46c1);
+/* ESPECÍFICO DISPONIBLES: Botón verde */
+.btn-disponible {
+  background: linear-gradient(135deg, #48bb78, #38a169);
+  color: white;
+  box-shadow: 0 2px 8px rgba(72, 187, 120, 0.3);
+}
+
+.btn-disponible:hover {
+  background: linear-gradient(135deg, #38a169, #2f855a);
   transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 16px rgba(72, 187, 120, 0.4);
   color: white;
   text-decoration: none;
 }
 
-/* Producto sin stock */
-.producto-card.sin-stock {
-  opacity: 0.75;
+/* ESPECÍFICO AGOTADOS: Botón naranja */
+.btn-agotado {
+  background: linear-gradient(135deg, #ed8936, #dd6b20);
+  color: white;
+  box-shadow: 0 2px 8px rgba(237, 137, 54, 0.3);
 }
 
-.producto-card.sin-stock .producto-imagen img {
-  filter: grayscale(0.5) brightness(0.8);
+.btn-agotado:hover {
+  background: linear-gradient(135deg, #dd6b20, #c05621);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(237, 137, 54, 0.4);
+  color: white;
+  text-decoration: none;
 }
 
-/* Estados de carga */
+.btn-icon {
+  font-size: 1rem;
+}
+
+/* NUEVO: Mensaje para productos agotados */
+.mensaje-agotado {
+  margin: 8px 0 0 0;
+  font-size: 0.75rem;
+  color: #744210;
+  text-align: center;
+  font-style: italic;
+  background: #fef5e7;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid #fbd38d;
+}
+
+/* Estados de carga (sin cambios) */
 .loading {
   display: flex;
   flex-direction: column;
@@ -316,7 +531,7 @@
   font-weight: 500;
 }
 
-/* Estados de error */
+/* Estados de error (sin cambios) */
 .error {
   background: white;
   padding: 40px;
@@ -361,7 +576,7 @@
   transform: translateY(-1px);
 }
 
-/* Estado vacío */
+/* Estado vacío (actualizado) */
 .empty {
   background: white;
   padding: 48px 32px;
@@ -396,44 +611,7 @@
   padding-left: 20px;
 }
 
-.empty-actions {
-  display: flex;
-  gap: 16px;
-  justify-content: center;
-  margin: 24px 0;
-  flex-wrap: wrap;
-}
-
-.btn-debug, .btn-create-data {
-  padding: 10px 20px;
-  border: 2px solid #667eea;
-  background: white;
-  color: #667eea;
-  border-radius: 10px;
-  cursor: pointer;
-  font-weight: 600;
-  text-decoration: none;
-  transition: all 0.3s ease;
-  font-size: 0.9rem;
-}
-
-.btn-debug:hover, .btn-create-data:hover {
-  background: #667eea;
-  color: white;
-  transform: translateY(-1px);
-}
-
-.btn-create-data {
-  border-color: #48bb78;
-  color: #48bb78;
-}
-
-.btn-create-data:hover {
-  background: #48bb78;
-  color: white;
-}
-
-/* Footer de categoría */
+/* Footer de categoría MEJORADO */
 .categoria-footer {
   background: white;
   padding: 24px;
@@ -446,8 +624,15 @@
 .categoria-info {
   color: #718096;
   font-size: 1rem;
-  margin: 0;
+  margin: 0 0 8px 0;
   font-weight: 500;
+}
+
+.categoria-note {
+  color: #a0aec0;
+  font-size: 0.9rem;
+  margin: 0;
+  font-style: italic;
 }
 
 /* Responsive adjustments */
@@ -464,6 +649,12 @@
     font-size: 2rem;
   }
   
+  .stats-breakdown {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
   .producto-imagen {
     height: 200px;
   }
@@ -476,14 +667,19 @@
     padding: 12px 16px;
   }
   
-  .error-actions, .empty-actions {
+  .error-actions {
     flex-direction: column;
     align-items: center;
   }
   
-  .variantes-badge {
-    font-size: 0.75rem;
+  .variantes-badge, .stock-bajo-badge {
+    font-size: 0.7rem;
     padding: 4px 8px;
+  }
+  
+  .agotado-badge {
+    font-size: 0.7rem;
+    padding: 6px 12px;
   }
 }
 
@@ -502,5 +698,10 @@
   
   .producto-precio {
     font-size: 1.2rem;
+  }
+  
+  .btn-ver-detalles {
+    padding: 10px 12px;
+    font-size: 0.9rem;
   }
 }

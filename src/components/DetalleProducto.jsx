@@ -1,8 +1,7 @@
-// components/DetalleProducto.jsx
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom'; // Agregado Link aquí
+import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
-import { Heart, Share2, Truck, Shield, RotateCcw, Star } from 'lucide-react';
+import { Heart, Share2, Truck, Shield, RotateCcw, Star, AlertTriangle } from 'lucide-react';
 import { useCarrito } from '../context/CarritoContext';
 import { toast } from 'react-toastify';
 import '../styles/DetalleProducto.css';
@@ -27,14 +26,22 @@ const DetalleProducto = () => {
         setError(null);
         
         const response = await axios.get(`http://localhost:3000/api/productos/${id}`);
-        setProducto(response.data);
+        const productoData = response.data;
         
-        // Auto-seleccionar la primera talla disponible
-        if (response.data.detalles && response.data.detalles.length > 0) {
-          const primerTallaDisponible = response.data.detalles.find(d => d.stock > 0);
+        console.log('📦 Producto obtenido:', productoData);
+        
+        setProducto(productoData);
+        
+        // Auto-seleccionar la primera talla disponible con stock
+        if (productoData.detalles && productoData.detalles.length > 0) {
+          const primerTallaDisponible = productoData.detalles.find(d => d.stock > 0);
           if (primerTallaDisponible) {
             setSelectedTalla(primerTallaDisponible.talla_id_talla);
             setSelectedDetalle(primerTallaDisponible);
+          } else {
+            // Si no hay stock, seleccionar la primera talla para mostrar info
+            setSelectedTalla(productoData.detalles[0].talla_id_talla);
+            setSelectedDetalle(productoData.detalles[0]);
           }
         }
       } catch (err) {
@@ -50,6 +57,28 @@ const DetalleProducto = () => {
     }
   }, [id]);
 
+  // Función para determinar el estado del producto
+  const getEstadoProducto = () => {
+    if (!producto || !producto.detalles || producto.detalles.length === 0) {
+      return { tipo: 'sin-info', nombre: 'Sin información' };
+    }
+
+    const stockTotal = producto.detalles.reduce((total, detalle) => total + (detalle.stock || 0), 0);
+    
+    // Verificar si el producto está inhabilitado (esto debería venir del backend)
+    // Por ahora, asumimos que si llega aquí, está activo
+    
+    if (stockTotal === 0) {
+      return { tipo: 'agotado', nombre: 'Agotado' };
+    }
+    
+    if (stockTotal <= 5) {
+      return { tipo: 'stock-bajo', nombre: 'Stock limitado' };
+    }
+    
+    return { tipo: 'disponible', nombre: 'Disponible' };
+  };
+
   const handleTallaChange = (talla) => {
     setSelectedTalla(talla);
     const detalle = producto.detalles.find(d => d.talla_id_talla === talla);
@@ -63,15 +92,15 @@ const DetalleProducto = () => {
       return;
     }
 
+    if (selectedDetalle.stock === 0) {
+      toast.error('Esta talla está agotada');
+      return;
+    }
+
     setAgregandoCarrito(true);
     
     try {
-      // Tu backend espera: { detalle_producto_id, cantidad }
       const result = await agregarAlCarrito(selectedDetalle.id_detalle_producto, quantity);
-      
-      // Tu backend devuelve: { success: true/false, message: "..." }
-      // El toast ya se maneja dentro de agregarAlCarrito
-      
     } catch (error) {
       console.error('Error al agregar al carrito:', error);
       toast.error('Error al agregar el producto al carrito');
@@ -93,13 +122,24 @@ const DetalleProducto = () => {
     
     return Array.from(tallasMap.values()).sort((a, b) => {
       const order = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
-      return order.indexOf(a.talla_id_talla) - order.indexOf(b.talla_id_talla);
+      const indexA = order.indexOf(a.talla_id_talla);
+      const indexB = order.indexOf(b.talla_id_talla);
+      
+      // Si no están en el orden predefinido, usar orden alfabético
+      if (indexA === -1 && indexB === -1) {
+        return a.talla_id_talla.localeCompare(b.talla_id_talla);
+      }
+      if (indexA === -1) return 1;
+      if (indexB === -1) return -1;
+      
+      return indexA - indexB;
     });
   };
 
-  // Verificar si el producto está en el carrito
+  const estadoProducto = getEstadoProducto();
   const isProductInCart = selectedDetalle ? estaEnCarrito(selectedDetalle.id_detalle_producto) : false;
   const cantidadEnCarrito = selectedDetalle ? getCantidadProducto(selectedDetalle.id_detalle_producto) : 0;
+  const stockTotal = producto?.detalles?.reduce((total, detalle) => total + (detalle.stock || 0), 0) || 0;
 
   if (loading) {
     return (
@@ -141,7 +181,7 @@ const DetalleProducto = () => {
   const tallasDisponibles = getTallasUnicas();
 
   return (
-    <div className="detalle-producto-page">
+    <div className={`detalle-producto-page ${estadoProducto.tipo === 'agotado' ? 'producto-agotado' : ''}`}>
       {/* Breadcrumb */}
       <div className="breadcrumb-container">
         <nav className="breadcrumb">
@@ -169,6 +209,17 @@ const DetalleProducto = () => {
       </div>
 
       <div className="detalle-producto-content">
+        {/* Alerta de producto agotado */}
+        {estadoProducto.tipo === 'agotado' && (
+          <div className="alerta-agotado">
+            <AlertTriangle className="alerta-icon" />
+            <div className="alerta-content">
+              <h4>Producto temporalmente agotado</h4>
+              <p>Este producto no tiene stock disponible actualmente. Puedes ver los detalles y agregarlo a favoritos para recibir notificaciones cuando esté disponible.</p>
+            </div>
+          </div>
+        )}
+
         <div className="producto-grid">
           
           {/* Imagen del producto */}
@@ -177,11 +228,24 @@ const DetalleProducto = () => {
               <img
                 src={producto.imagen_url}
                 alt={producto.nombre_producto}
-                className="producto-imagen"
+                className={`producto-imagen ${estadoProducto.tipo === 'agotado' ? 'imagen-agotada' : ''}`}
                 onError={(e) => {
                   e.target.src = '/placeholder-image.jpg';
                 }}
               />
+              
+              {/* Badge de estado del producto */}
+              {estadoProducto.tipo === 'agotado' && (
+                <div className="badge-estado agotado">
+                  <span>AGOTADO</span>
+                </div>
+              )}
+              
+              {estadoProducto.tipo === 'stock-bajo' && (
+                <div className="badge-estado stock-bajo">
+                  <span>¡ÚLTIMAS UNIDADES!</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -194,18 +258,28 @@ const DetalleProducto = () => {
                 {producto.nombre_producto}
               </h1>
               
-              {selectedDetalle && (
-                <div className="producto-precio-container">
-                  <span className="producto-precio">
-                    ${selectedDetalle.precio.toLocaleString('es-CL')}
-                  </span>
-                  {selectedDetalle.stock < 5 && selectedDetalle.stock > 0 && (
-                    <span className="stock-bajo-alerta">
-                      ¡Solo quedan {selectedDetalle.stock}!
-                    </span>
+              {/* Estado y precio */}
+              <div className="estado-precio-container">
+                <div className={`estado-producto ${estadoProducto.tipo}`}>
+                  <span className="estado-texto">{estadoProducto.nombre}</span>
+                  {stockTotal > 0 && (
+                    <span className="stock-total">({stockTotal} unidades disponibles)</span>
                   )}
                 </div>
-              )}
+                
+                {selectedDetalle && (
+                  <div className="producto-precio-container">
+                    <span className={`producto-precio ${estadoProducto.tipo === 'agotado' ? 'precio-agotado' : ''}`}>
+                      ${selectedDetalle.precio.toLocaleString('es-CL')}
+                    </span>
+                    {selectedDetalle.stock < 5 && selectedDetalle.stock > 0 && (
+                      <span className="stock-bajo-alerta">
+                        ¡Solo quedan {selectedDetalle.stock}!
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
 
               {/* Rating */}
               <div className="producto-rating">
@@ -223,7 +297,7 @@ const DetalleProducto = () => {
               <p>{producto.descripcion}</p>
             </div>
 
-            {/* Selector de talla */}
+            {/* Selector de talla MEJORADO */}
             <div className="talla-selector-section">
               <div className="talla-header">
                 <label className="talla-label">
@@ -235,25 +309,50 @@ const DetalleProducto = () => {
               </div>
               
               <div className="tallas-grid">
-                {tallasDisponibles.map((detalle) => (
-                  <button
-                    key={detalle.talla_id_talla}
-                    onClick={() => handleTallaChange(detalle.talla_id_talla)}
-                    disabled={detalle.stock === 0}
-                    className={`talla-btn ${
-                      selectedTalla === detalle.talla_id_talla ? 'talla-btn-selected' : ''
-                    } ${detalle.stock === 0 ? 'talla-btn-disabled' : ''}`}
-                  >
-                    {detalle.talla_id_talla}
-                    {detalle.stock === 0 && <div className="talla-agotada-line"></div>}
-                  </button>
-                ))}
+                {tallasDisponibles.map((detalle) => {
+                  const estaAgotada = detalle.stock === 0;
+                  const esStockBajo = detalle.stock > 0 && detalle.stock <= 3;
+                  
+                  return (
+                    <button
+                      key={detalle.talla_id_talla}
+                      onClick={() => !estaAgotada && handleTallaChange(detalle.talla_id_talla)}
+                      disabled={estaAgotada}
+                      className={`talla-btn ${
+                        selectedTalla === detalle.talla_id_talla ? 'talla-btn-selected' : ''
+                      } ${estaAgotada ? 'talla-btn-agotada' : ''} ${
+                        esStockBajo ? 'talla-btn-stock-bajo' : ''
+                      }`}
+                      title={estaAgotada ? 'Talla agotada' : esStockBajo ? `Solo ${detalle.stock} disponibles` : `${detalle.stock} disponibles`}
+                    >
+                      {detalle.talla_id_talla}
+                      {estaAgotada && <div className="talla-agotada-line"></div>}
+                      {esStockBajo && !estaAgotada && (
+                        <div className="talla-stock-bajo-indicator">!</div>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
 
               {selectedDetalle && (
                 <div className="stock-info-container">
-                  <p className="stock-info">
-                    Stock disponible: <span className="stock-number">{selectedDetalle.stock} unidades</span>
+                  <p className={`stock-info ${selectedDetalle.stock === 0 ? 'stock-agotado' : selectedDetalle.stock <= 5 ? 'stock-bajo' : 'stock-ok'}`}>
+                    {selectedDetalle.stock === 0 ? (
+                      <>
+                        <AlertTriangle className="stock-icon" />
+                        Esta talla está agotada
+                      </>
+                    ) : selectedDetalle.stock <= 5 ? (
+                      <>
+                        <AlertTriangle className="stock-icon" />
+                        ¡Solo quedan <span className="stock-number">{selectedDetalle.stock}</span> en esta talla!
+                      </>
+                    ) : (
+                      <>
+                        Stock disponible: <span className="stock-number">{selectedDetalle.stock} unidades</span>
+                      </>
+                    )}
                   </p>
                   {isProductInCart && (
                     <p className="carrito-info">
@@ -264,7 +363,7 @@ const DetalleProducto = () => {
               )}
             </div>
 
-            {/* Cantidad */}
+            {/* Cantidad - Solo mostrar si hay stock */}
             {selectedDetalle && selectedDetalle.stock > 0 && (
               <div className="cantidad-section">
                 <label className="cantidad-label">Cantidad</label>
@@ -293,48 +392,82 @@ const DetalleProducto = () => {
               </div>
             )}
 
-            {/* Botones de acción */}
+            {/* Botones de acción MEJORADOS */}
             <div className="acciones-section">
-              <button
-                onClick={handleAddToCart}
-                disabled={!selectedDetalle || selectedDetalle.stock === 0 || agregandoCarrito}
-                className={`add-to-cart-btn ${
-                  !selectedDetalle || selectedDetalle.stock === 0 ? 'add-to-cart-btn-disabled' : ''
-                }`}
-              >
-                {agregandoCarrito ? (
-                  <>
-                    <div className="loading-spinner-btn"></div>
-                    Agregando...
-                  </>
-                ) : !selectedDetalle || selectedDetalle.stock === 0 ? (
-                  'No disponible'
-                ) : (
-                  'Agregar al carrito'
-                )}
-              </button>
+              {estadoProducto.tipo === 'agotado' ? (
+                // Botones para producto agotado
+                <div className="acciones-agotado">
+                  <button className="btn-notificar">
+                    <Heart className="action-icon" />
+                    Notificarme cuando esté disponible
+                  </button>
+                  <div className="secondary-actions">
+                    <button
+                      onClick={() => setIsFavorite(!isFavorite)}
+                      className={`secondary-btn ${isFavorite ? 'favorite-active' : ''}`}
+                    >
+                      <Heart className={`action-icon ${isFavorite ? 'heart-filled' : ''}`} />
+                      <span>Favoritos</span>
+                    </button>
+                    
+                    <button className="secondary-btn">
+                      <Share2 className="action-icon" />
+                      <span>Compartir</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                // Botones para producto disponible
+                <>
+                  <button
+                    onClick={handleAddToCart}
+                    disabled={!selectedDetalle || selectedDetalle.stock === 0 || agregandoCarrito}
+                    className={`add-to-cart-btn ${
+                      !selectedDetalle || selectedDetalle.stock === 0 ? 'add-to-cart-btn-disabled' : ''
+                    } ${estadoProducto.tipo === 'stock-bajo' ? 'btn-urgente' : ''}`}
+                  >
+                    {agregandoCarrito ? (
+                      <>
+                        <div className="loading-spinner-btn"></div>
+                        Agregando...
+                      </>
+                    ) : !selectedDetalle || selectedDetalle.stock === 0 ? (
+                      'Talla no disponible'
+                    ) : estadoProducto.tipo === 'stock-bajo' ? (
+                      '¡Agregar ahora - Stock limitado!'
+                    ) : (
+                      'Agregar al carrito'
+                    )}
+                  </button>
 
-              <div className="secondary-actions">
-                <button
-                  onClick={() => setIsFavorite(!isFavorite)}
-                  className={`secondary-btn ${isFavorite ? 'favorite-active' : ''}`}
-                >
-                  <Heart className={`action-icon ${isFavorite ? 'heart-filled' : ''}`} />
-                  <span>Favoritos</span>
-                </button>
-                
-                <button className="secondary-btn">
-                  <Share2 className="action-icon" />
-                  <span>Compartir</span>
-                </button>
-              </div>
+                  <div className="secondary-actions">
+                    <button
+                      onClick={() => setIsFavorite(!isFavorite)}
+                      className={`secondary-btn ${isFavorite ? 'favorite-active' : ''}`}
+                    >
+                      <Heart className={`action-icon ${isFavorite ? 'heart-filled' : ''}`} />
+                      <span>Favoritos</span>
+                    </button>
+                    
+                    <button className="secondary-btn">
+                      <Share2 className="action-icon" />
+                      <span>Compartir</span>
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Información adicional */}
             <div className="info-adicional">
               <div className="info-item">
                 <Truck className="info-icon" />
-                <span>Envío gratis en pedidos superiores a $50.000</span>
+                <span>
+                  {estadoProducto.tipo === 'agotado' 
+                    ? 'Envío gratis cuando esté disponible' 
+                    : 'Envío gratis en pedidos superiores a $50.000'
+                  }
+                </span>
               </div>
               <div className="info-item">
                 <RotateCcw className="info-icon" />
@@ -344,6 +477,13 @@ const DetalleProducto = () => {
                 <Shield className="info-icon" />
                 <span>Compra 100% segura</span>
               </div>
+              
+              {estadoProducto.tipo === 'agotado' && (
+                <div className="info-item info-agotado">
+                  <AlertTriangle className="info-icon" />
+                  <span>Te notificaremos por email cuando esté disponible</span>
+                </div>
+              )}
             </div>
 
             {/* Marca y categoría */}
@@ -355,6 +495,7 @@ const DetalleProducto = () => {
                 {producto.categoria && (
                   <p><span className="detalle-label">Categoría:</span> {producto.categoria.nombre_categoria}</p>
                 )}
+                <p><span className="detalle-label">Estado:</span> {estadoProducto.nombre}</p>
               </div>
             )}
           </div>

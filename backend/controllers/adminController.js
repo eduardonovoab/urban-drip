@@ -208,20 +208,6 @@ export const addProduct = async (req, res) => {
     connection.release();
   }
 };
-
-export const obtenerEstadosProducto = async (req, res) => {
-  try {
-    const [estados] = await pool.execute(
-      'SELECT id_estado, nombre_estado, descripcion_estado FROM estado_producto ORDER BY nombre_estado'
-    );
-
-    res.json(estados);
-  } catch (error) {
-    console.error('Error al obtener estados de producto:', error);
-    res.status(500).json({ error: 'Error al obtener los estados de producto' });
-  }
-};
-
 // Función para actualizar el estado de una variante específica
 export const actualizarEstadoVariante = async (req, res) => {
   try {
@@ -467,37 +453,6 @@ export const eliminarProducto = async (req, res) => {
     res.status(500).json({ error: 'Error al eliminar el producto' });
   } finally {
     conn.release();
-  }
-};
-
-// Listar todos los productos - CORREGIDO
-export const listarProductos = async (req, res) => {
-  try {
-    const [productos] = await pool.query(`
-      SELECT 
-        p.id_producto, 
-        p.nombre_producto, 
-        p.descripcion, 
-        p.imagen_url, 
-        pd.precio,  
-        c.nombre_categoria,
-        m.nombre_marca,  
-        t.nombre_talla,
-        pd.stock,
-        pd.id_detalle_producto
-      FROM producto p
-      INNER JOIN categoria c ON p.categoria_id_categoria = c.id_categoria  
-      INNER JOIN producto_detalle pd ON p.id_producto = pd.producto_id_producto  
-      INNER JOIN marca m ON pd.marca_id_marca = m.id_marca  
-      INNER JOIN talla t ON pd.talla_id_talla = t.id_talla
-      ORDER BY p.id_producto, t.nombre_talla
-    `);
-
-    console.log('📋 Productos obtenidos:', productos.length);
-    res.json(productos);
-  } catch (err) {
-    console.error('❌ Error al obtener productos:', err);
-    res.status(500).json({ error: 'Error al obtener productos' });
   }
 };
 
@@ -1150,57 +1105,6 @@ export const getEstadisticasPedidos = async (req, res) => {
     });
   }
 };
-export const actualizarDatosBasicosProducto = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { nombre, descripcion, imagen_url, categoria_id } = req.body;
-
-    // Validaciones
-    if (!nombre || !descripcion || !categoria_id) {
-      return res.status(400).json({ 
-        error: 'Nombre, descripción y categoría son obligatorios' 
-      });
-    }
-
-    // Verificar que el producto existe - CORREGIR NOMBRE DE TABLA
-    const [existeProducto] = await pool.execute(
-      'SELECT id_producto FROM producto WHERE id_producto = ?',
-      [id]
-    );
-
-    if (existeProducto.length === 0) {
-      return res.status(404).json({ error: 'Producto no encontrado' });
-    }
-
-    // Actualizar datos básicos - CORREGIR NOMBRES DE COLUMNAS
-    const query = `
-      UPDATE producto 
-      SET nombre_producto = ?, 
-          descripcion = ?, 
-          imagen_url = ?, 
-          categoria_id_categoria = ?
-      WHERE id_producto = ?
-    `;
-
-    await pool.execute(query, [
-      nombre.trim(),
-      descripcion.trim(),
-      imagen_url ? imagen_url.trim() : '',
-      categoria_id,
-      id
-    ]);
-
-    res.json({ message: 'Datos básicos actualizados correctamente' });
-
-  } catch (error) {
-    console.error('Error al actualizar datos básicos:', error);
-    res.status(500).json({ 
-      error: 'Error interno del servidor',
-      details: error.message 
-    });
-  }
-};
-
 export const eliminarDetalleProducto = async (req, res) => {
   const connection = await pool.getConnection();
   
@@ -1593,5 +1497,1387 @@ export const obtenerProductoParaEdicionSimple = async (req, res) => {
       error: 'Error interno del servidor',
       details: error.message 
     });
+  }
+};
+/**
+ * Actualizar estado de un producto específico - NUEVA LÓGICA
+ * PUT /api/admin/producto/:id/estado
+ * Solo permite cambios entre Disponible (1) ↔ Inhabilitado (3)
+ */
+export const actualizarEstadoProducto = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { estado_id, descripcion_cambio } = req.body;
+
+    console.log('🔄 Actualizando estado del producto:', {
+      producto_id: id,
+      nuevo_estado: estado_id,
+      descripcion: descripcion_cambio
+    });
+
+    // Validar que el producto existe
+    const [productoExiste] = await pool.execute(
+      'SELECT id_producto FROM producto WHERE id_producto = ?',
+      [id]
+    );
+
+    if (productoExiste.length === 0) {
+      return res.status(404).json({
+        error: 'Producto no encontrado'
+      });
+    }
+
+    // NUEVA VALIDACIÓN: Solo permitir estados 1 (Disponible) y 3 (Inhabilitado)
+    const estadosPermitidos = [1, 3]; // Solo Disponible e Inhabilitado
+    if (!estadosPermitidos.includes(parseInt(estado_id))) {
+      return res.status(400).json({
+        error: 'Solo se puede cambiar entre estados "Disponible" e "Inhabilitado"',
+        estados_permitidos: {
+          1: 'Disponible',
+          3: 'Inhabilitado'
+        },
+        nota: 'El estado "Agotado" se asigna automáticamente cuando el stock llega a 0'
+      });
+    }
+
+    // Obtener estado actual del producto
+    const [estadoActualQuery] = await pool.execute(`
+      SELECT esp.estado_producto_id_estado as estado_actual
+      FROM detalle_estado_pro esp 
+      JOIN producto_detalle pd ON esp.producto_detalle_id_detalle_producto = pd.id_detalle_producto
+      WHERE pd.producto_id_producto = ? 
+      ORDER BY esp.fecha_cb_estado DESC, esp.id_detalle_estado DESC
+      LIMIT 1
+    `, [id]);
+
+    const estadoActual = estadoActualQuery.length > 0 ? parseInt(estadoActualQuery[0].estado_actual) : null;
+
+    // Validar transición de estado
+    if (estadoActual === parseInt(estado_id)) {
+      return res.status(400).json({
+        error: `El producto ya está en estado "${estado_id === 1 ? 'Disponible' : 'Inhabilitado'}"`
+      });
+    }
+
+    // NUEVA VALIDACIÓN: Si el producto tiene stock 0 y se intenta poner disponible
+    if (parseInt(estado_id) === 1) {
+      const [stockTotal] = await pool.execute(`
+        SELECT COALESCE(SUM(pd.stock), 0) as stock_total
+        FROM producto_detalle pd
+        WHERE pd.producto_id_producto = ?
+      `, [id]);
+
+      if (stockTotal[0].stock_total === 0) {
+        return res.status(400).json({
+          error: 'No se puede marcar como disponible un producto sin stock',
+          nota: 'Agregue stock al producto para que pueda estar disponible'
+        });
+      }
+    }
+
+    // Insertar en el historial de cambios de estado
+    const descripcionFinal = descripcion_cambio || 
+      `Estado cambiado manualmente a ${estado_id === 1 ? 'Disponible' : 'Inhabilitado'} - ${new Date().toLocaleString()}`;
+    
+    const insertHistorialQuery = `
+      INSERT INTO detalle_estado_pro (
+        fecha_cb_estado,
+        descripcion_cb_estado,
+        producto_detalle_id_detalle_producto,
+        estado_producto_id_estado
+      )
+      SELECT 
+        CURDATE(),
+        ?,
+        pd.id_detalle_producto,
+        ?
+      FROM producto_detalle pd 
+      WHERE pd.producto_id_producto = ?
+    `;
+
+    await pool.execute(insertHistorialQuery, [
+      descripcionFinal,
+      estado_id,
+      id
+    ]);
+
+    console.log('✅ Estado del producto actualizado correctamente');
+
+    res.status(200).json({
+      message: 'Estado del producto actualizado correctamente',
+      producto_id: id,
+      estado_anterior: estadoActual,
+      nuevo_estado: parseInt(estado_id),
+      descripcion: estado_id === 1 ? 'Disponible' : 'Inhabilitado'
+    });
+
+  } catch (error) {
+    console.error('❌ Error al actualizar estado del producto:', error);
+    res.status(500).json({
+      error: 'Error interno del servidor',
+      message: 'No se pudo actualizar el estado del producto'
+    });
+  }
+};
+
+/**
+ * Actualizar automáticamente estados basado en stock - NUEVA LÓGICA
+ * POST /api/admin/productos/actualizar-estados-automaticos
+ * Solo cambia entre Disponible (1) ↔ Agotado (2)
+ * NO toca productos Inhabilitados (3)
+ */
+export const actualizarEstadosAutomaticos = async (req, res) => {
+  try {
+    console.log('🤖 Iniciando actualización automática de estados...');
+
+    // Obtener productos con stock total y estado actual
+    // EXCLUIR productos inhabilitados (estado 3)
+    const productosQuery = `
+      SELECT 
+        p.id_producto,
+        p.nombre_producto,
+        COALESCE(SUM(pd.stock), 0) as stock_total,
+        (
+          SELECT esp.estado_producto_id_estado 
+          FROM detalle_estado_pro esp 
+          JOIN producto_detalle pd2 ON esp.producto_detalle_id_detalle_producto = pd2.id_detalle_producto
+          WHERE pd2.producto_id_producto = p.id_producto 
+          ORDER BY esp.fecha_cb_estado DESC, esp.id_detalle_estado DESC
+          LIMIT 1
+        ) as estado_actual
+      FROM producto p
+      LEFT JOIN producto_detalle pd ON p.id_producto = pd.producto_id_producto
+      GROUP BY p.id_producto, p.nombre_producto
+      HAVING estado_actual IS NOT NULL AND estado_actual != 3  -- EXCLUIR inhabilitados
+    `;
+
+    const [productos] = await pool.execute(productosQuery);
+
+    let productosActualizados = 0;
+    const cambios = [];
+
+    for (const producto of productos) {
+      const estadoActual = parseInt(producto.estado_actual);
+      const stockTotal = parseInt(producto.stock_total);
+      
+      // NUEVA LÓGICA: Solo cambiar entre Disponible (1) y Agotado (2)
+      let nuevoEstado = null;
+      
+      if (estadoActual === 1 && stockTotal === 0) {
+        nuevoEstado = 2; // Disponible → Agotado
+      } else if (estadoActual === 2 && stockTotal > 0) {
+        nuevoEstado = 1; // Agotado → Disponible
+      }
+      
+      if (nuevoEstado && nuevoEstado !== estadoActual) {
+        // Actualizar estado
+        const descripcion = `Estado actualizado automáticamente: ${nuevoEstado === 1 ? 'Disponible' : 'Agotado'} (Stock: ${stockTotal}) - ${new Date().toLocaleString()}`;
+        
+        const insertQuery = `
+          INSERT INTO detalle_estado_pro (
+            fecha_cb_estado,
+            descripcion_cb_estado,
+            producto_detalle_id_detalle_producto,
+            estado_producto_id_estado
+          )
+          SELECT 
+            CURDATE(),
+            ?,
+            pd.id_detalle_producto,
+            ?
+          FROM producto_detalle pd 
+          WHERE pd.producto_id_producto = ?
+        `;
+
+        await pool.execute(insertQuery, [
+          descripcion,
+          nuevoEstado,
+          producto.id_producto
+        ]);
+
+        productosActualizados++;
+        cambios.push({
+          id: producto.id_producto,
+          nombre: producto.nombre_producto,
+          estadoAnterior: estadoActual,
+          estadoNuevo: nuevoEstado,
+          stock: stockTotal
+        });
+        
+        console.log(`📦 Producto "${producto.nombre_producto}": Estado ${estadoActual} → ${nuevoEstado} (Stock: ${stockTotal})`);
+      }
+    }
+
+    console.log(`✅ Actualización automática completada: ${productosActualizados} productos actualizados`);
+
+    res.status(200).json({
+      message: 'Estados actualizados automáticamente',
+      productos_procesados: productos.length,
+      productos_actualizados: productosActualizados,
+      cambios: cambios,
+      nota: 'Solo se actualizan productos Disponibles ↔ Agotados. Los Inhabilitados se mantienen sin cambios.'
+    });
+
+  } catch (error) {
+    console.error('❌ Error en actualización automática de estados:', error);
+    res.status(500).json({
+      error: 'Error interno del servidor',
+      message: 'No se pudieron actualizar los estados automáticamente'
+    });
+  }
+};
+
+/**
+ * REEMPLAZAR la función existente actualizarDatosBasicosProducto - NUEVA LÓGICA
+ * PUT /api/admin/producto/:id/datos-basicos
+ */
+export const actualizarDatosBasicosProductoConEstado = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nombre, descripcion, imagen_url, categoria_id, estado_id } = req.body;
+
+    console.log('📝 Actualizando datos básicos del producto con estado:', {
+      id,
+      nombre,
+      descripcion,
+      categoria_id,
+      estado_id
+    });
+
+    // Validar datos requeridos
+    if (!nombre || !descripcion || !categoria_id) {
+      return res.status(400).json({
+        error: 'Faltan campos obligatorios',
+        requeridos: ['nombre', 'descripcion', 'categoria_id']
+      });
+    }
+
+    // Verificar que el producto existe
+    const [productoExiste] = await pool.execute(
+      'SELECT id_producto FROM producto WHERE id_producto = ?',
+      [id]
+    );
+
+    if (productoExiste.length === 0) {
+      return res.status(404).json({
+        error: 'Producto no encontrado'
+      });
+    }
+
+    // Verificar que la categoría existe
+    const [categoriaExiste] = await pool.execute(
+      'SELECT id_categoria FROM categoria WHERE id_categoria = ?',
+      [categoria_id]
+    );
+
+    if (categoriaExiste.length === 0) {
+      return res.status(400).json({
+        error: 'Categoría no válida'
+      });
+    }
+
+    // Actualizar datos básicos del producto
+    const updateQuery = `
+      UPDATE producto 
+      SET 
+        nombre_producto = ?,
+        descripcion = ?,
+        imagen_url = ?,
+        categoria_id_categoria = ?
+      WHERE id_producto = ?
+    `;
+
+    await pool.execute(updateQuery, [
+      nombre.trim(),
+      descripcion.trim(),
+      imagen_url ? imagen_url.trim() : '',
+      categoria_id,
+      id
+    ]);
+
+    // Si se proporciona estado_id, validar y actualizar estado del producto - NUEVA LÓGICA
+    if (estado_id) {
+      // NUEVA VALIDACIÓN: Solo permitir estados 1 (Disponible) y 3 (Inhabilitado)
+      const estadosPermitidos = [1, 3];
+      if (!estadosPermitidos.includes(parseInt(estado_id))) {
+        return res.status(400).json({
+          error: 'Solo se pueden asignar estados "Disponible" (1) e "Inhabilitado" (3)',
+          nota: 'El estado "Agotado" (2) se asigna automáticamente'
+        });
+      }
+
+      // Verificar que el estado existe
+      const [estadoExiste] = await pool.execute(
+        'SELECT id_estado FROM estado_producto WHERE id_estado = ?',
+        [estado_id]
+      );
+
+      if (estadoExiste.length === 0) {
+        return res.status(400).json({
+          error: 'Estado no válido'
+        });
+      }
+
+      // NUEVA VALIDACIÓN: Si se intenta poner disponible, verificar que hay stock
+      if (parseInt(estado_id) === 1) {
+        const [stockTotal] = await pool.execute(`
+          SELECT COALESCE(SUM(pd.stock), 0) as stock_total
+          FROM producto_detalle pd
+          WHERE pd.producto_id_producto = ?
+        `, [id]);
+
+        if (stockTotal[0].stock_total === 0) {
+          return res.status(400).json({
+            error: 'No se puede marcar como disponible un producto sin stock',
+            nota: 'Agregue stock al producto primero'
+          });
+        }
+      }
+
+      // Actualizar estado del producto (crear entrada en historial)
+      const descripcionEstado = `Datos básicos actualizados con cambio de estado a ${estado_id === 1 ? 'Disponible' : 'Inhabilitado'} - ${new Date().toLocaleString()}`;
+      
+      const insertEstadoQuery = `
+        INSERT INTO detalle_estado_pro (
+          fecha_cb_estado,
+          descripcion_cb_estado,
+          producto_detalle_id_detalle_producto,
+          estado_producto_id_estado
+        )
+        SELECT 
+          CURDATE(),
+          ?,
+          pd.id_detalle_producto,
+          ?
+        FROM producto_detalle pd 
+        WHERE pd.producto_id_producto = ?
+      `;
+
+      await pool.execute(insertEstadoQuery, [
+        descripcionEstado,
+        estado_id,
+        id
+      ]);
+    }
+
+    console.log('✅ Datos básicos del producto actualizados correctamente');
+
+    res.status(200).json({
+      message: 'Datos básicos del producto actualizados correctamente',
+      producto_id: id,
+      estado_actualizado: estado_id ? true : false
+    });
+
+  } catch (error) {
+    console.error('❌ Error al actualizar datos básicos del producto:', error);
+    res.status(500).json({
+      error: 'Error interno del servidor',
+      message: 'No se pudieron actualizar los datos del producto'
+    });
+  }
+};
+
+/**
+ * NUEVO: Obtener solo estados manuales permitidos (Disponible e Inhabilitado)
+ * GET /api/admin/estados-producto/manuales
+ */
+export const obtenerEstadosManuales = async (req, res) => {
+  try {
+    console.log('📋 Obteniendo estados manuales permitidos...');
+
+    const query = `
+      SELECT 
+        id_estado,
+        nombre_estado,
+        descripcion_estado
+      FROM estado_producto 
+      WHERE id_estado IN (1, 3)  -- Solo Disponible e Inhabilitado
+      ORDER BY id_estado ASC
+    `;
+
+    const [estados] = await pool.execute(query);
+
+    console.log(`✅ Estados manuales obtenidos: ${estados.length}`);
+
+    res.status(200).json({
+      estados: estados,
+      nota: 'Solo se muestran estados que pueden cambiarse manualmente. El estado "Agotado" se asigna automáticamente.'
+    });
+
+  } catch (error) {
+    console.error('❌ Error al obtener estados manuales:', error);
+    res.status(500).json({
+      error: 'Error interno del servidor',
+      message: 'No se pudieron obtener los estados manuales'
+    });
+  }
+};
+
+/**
+ * NUEVO: Obtener productos activos para vistas públicas (excluye inhabilitados)
+ * GET /api/admin/productos/activos-publicos
+ */
+export const getProductosActivosPublicos = async (req, res) => {
+  try {
+    console.log('🔍 Obteniendo productos para vistas públicas (sin inhabilitados)...');
+
+    const query = `
+      SELECT DISTINCT
+        p.id_producto,
+        p.nombre_producto,
+        p.descripcion,
+        p.imagen_url,
+        pd.precio,
+        SUM(pd.stock) as stock_total,
+        c.nombre_categoria,
+        m.nombre_marca,
+        
+        -- Obtener estado actual del producto
+        (
+          SELECT esp.estado_producto_id_estado 
+          FROM detalle_estado_pro esp 
+          JOIN producto_detalle pd_estado ON esp.producto_detalle_id_detalle_producto = pd_estado.id_detalle_producto
+          WHERE pd_estado.producto_id_producto = p.id_producto 
+          ORDER BY esp.fecha_cb_estado DESC, esp.id_detalle_estado DESC
+          LIMIT 1
+        ) as estado_id,
+        
+        (
+          SELECT ep.nombre_estado
+          FROM detalle_estado_pro esp 
+          JOIN producto_detalle pd_estado ON esp.producto_detalle_id_detalle_producto = pd_estado.id_detalle_producto
+          JOIN estado_producto ep ON esp.estado_producto_id_estado = ep.id_estado
+          WHERE pd_estado.producto_id_producto = p.id_producto 
+          ORDER BY esp.fecha_cb_estado DESC, esp.id_detalle_estado DESC
+          LIMIT 1
+        ) as nombre_estado
+        
+      FROM producto p
+      JOIN categoria c ON p.categoria_id_categoria = c.id_categoria
+      JOIN producto_detalle pd ON p.id_producto = pd.producto_id_producto
+      JOIN marca m ON pd.marca_id_marca = m.id_marca
+      GROUP BY p.id_producto, p.nombre_producto, p.descripcion, p.imagen_url, pd.precio, c.nombre_categoria, m.nombre_marca
+      HAVING estado_id IN (1, 2)  -- Solo Disponibles (1) y Agotados (2), NO Inhabilitados (3)
+      ORDER BY p.nombre_producto ASC
+    `;
+
+    const [productos] = await pool.execute(query);
+
+    console.log(`✅ Productos activos para público obtenidos: ${productos.length}`);
+    
+    res.status(200).json({
+      productos: productos,
+      total: productos.length,
+      nota: 'Solo productos disponibles y agotados. Los inhabilitados están ocultos.'
+    });
+
+  } catch (error) {
+    console.error('❌ Error al obtener productos activos públicos:', error);
+    res.status(500).json({
+      error: 'Error interno del servidor',
+      message: 'No se pudieron obtener los productos activos'
+    });
+  }
+};
+// ===== FUNCIONES CORREGIDAS PARA MANEJAR ESTADOS DE PRODUCTOS =====
+
+/**
+ * 1. OBTENER PRODUCTO PARA EDICIÓN - CORREGIDO
+ * GET /api/admin/producto/:id/edicion
+ */
+export const obtenerProductoParaEdicion = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    console.log('🔍 Obteniendo producto para edición, ID:', id);
+
+    // Consulta corregida que obtiene el estado actual del producto
+    const query = `
+      SELECT 
+        p.id_producto,
+        p.nombre_producto,
+        p.descripcion,
+        p.imagen_url,
+        p.categoria_id_categoria,
+        c.nombre_categoria,
+        
+        -- Datos del detalle del producto
+        pd.id_detalle_producto as id_detalle,
+        pd.precio,
+        pd.stock,
+        pd.marca_id_marca,
+        pd.talla_id_talla,
+        m.nombre_marca,
+        t.nombre_talla,
+        
+        -- ESTADO ACTUAL DEL PRODUCTO (más reciente)
+        COALESCE(estado_actual.estado_id, 1) as estado_id,
+        COALESCE(estado_actual.nombre_estado, 'Disponible') as nombre_estado
+        
+      FROM producto p
+      LEFT JOIN categoria c ON p.categoria_id_categoria = c.id_categoria
+      LEFT JOIN producto_detalle pd ON p.id_producto = pd.producto_id_producto
+      LEFT JOIN marca m ON pd.marca_id_marca = m.id_marca
+      LEFT JOIN talla t ON pd.talla_id_talla = t.id_talla
+      
+      -- Subconsulta para obtener el estado más reciente del producto
+      LEFT JOIN (
+        SELECT 
+          pd_sub.producto_id_producto,
+          ep.id_estado as estado_id,
+          ep.nombre_estado,
+          ROW_NUMBER() OVER (
+            PARTITION BY pd_sub.producto_id_producto 
+            ORDER BY dep.fecha_cb_estado DESC, dep.id_detalle_estado DESC
+          ) as rn
+        FROM producto_detalle pd_sub
+        JOIN detalle_estado_pro dep ON pd_sub.id_detalle_producto = dep.producto_detalle_id_detalle_producto
+        JOIN estado_producto ep ON dep.estado_producto_id_estado = ep.id_estado
+      ) estado_actual ON p.id_producto = estado_actual.producto_id_producto AND estado_actual.rn = 1
+      
+      WHERE p.id_producto = ?
+      ORDER BY pd.id_detalle_producto
+    `;
+
+    const [rows] = await pool.execute(query, [id]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ 
+        error: 'Producto no encontrado' 
+      });
+    }
+
+    console.log('📋 Producto encontrado:', {
+      id: rows[0].id_producto,
+      nombre: rows[0].nombre_producto,
+      estado_id: rows[0].estado_id,
+      nombre_estado: rows[0].nombre_estado,
+      variantes: rows.filter(r => r.id_detalle).length
+    });
+    
+    res.json(rows);
+
+  } catch (error) {
+    console.error('❌ Error al obtener producto para edición:', error);
+    res.status(500).json({ 
+      error: 'Error interno del servidor',
+      details: error.message 
+    });
+  }
+};
+
+/**
+ * 2. ACTUALIZAR DATOS BÁSICOS DEL PRODUCTO CON ESTADO - CORREGIDO
+ * PUT /api/admin/producto/:id/datos-basicos
+ */
+export const actualizarDatosBasicosProducto = async (req, res) => {
+  const connection = await pool.getConnection();
+  
+  try {
+    const { id } = req.params;
+    const { nombre, descripcion, imagen_url, categoria_id, estado_id } = req.body;
+
+    console.log('📝 Actualizando datos básicos del producto:', {
+      id,
+      nombre,
+      descripcion,
+      categoria_id,
+      estado_id
+    });
+
+    // Validar datos requeridos
+    if (!nombre || !descripcion || !categoria_id) {
+      return res.status(400).json({
+        error: 'Faltan campos obligatorios: nombre, descripcion, categoria_id'
+      });
+    }
+
+    await connection.beginTransaction();
+
+    // Verificar que el producto existe
+    const [productoExiste] = await connection.execute(
+      'SELECT id_producto FROM producto WHERE id_producto = ?',
+      [id]
+    );
+
+    if (productoExiste.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({
+        error: 'Producto no encontrado'
+      });
+    }
+
+    // Actualizar datos básicos del producto
+    const updateQuery = `
+      UPDATE producto 
+      SET 
+        nombre_producto = ?,
+        descripcion = ?,
+        imagen_url = ?,
+        categoria_id_categoria = ?
+      WHERE id_producto = ?
+    `;
+
+    await connection.execute(updateQuery, [
+      nombre.trim(),
+      descripcion.trim(),
+      imagen_url ? imagen_url.trim() : '',
+      categoria_id,
+      id
+    ]);
+
+    console.log('✅ Datos básicos actualizados');
+
+    // Si se proporciona estado_id, actualizar estado
+    if (estado_id) {
+      console.log('🔄 Actualizando estado del producto a:', estado_id);
+
+      // Validar estado permitido (1=Disponible, 2=Agotado, 3=Inhabilitado)
+      const estadosValidos = [1, 2, 3];
+      if (!estadosValidos.includes(parseInt(estado_id))) {
+        await connection.rollback();
+        return res.status(400).json({
+          error: 'Estado no válido. Debe ser 1 (Disponible), 2 (Agotado) o 3 (Inhabilitado)'
+        });
+      }
+
+      // Verificar que el estado existe en la tabla estado_producto
+      const [estadoExiste] = await connection.execute(
+        'SELECT id_estado, nombre_estado FROM estado_producto WHERE id_estado = ?',
+        [estado_id]
+      );
+
+      if (estadoExiste.length === 0) {
+        await connection.rollback();
+        return res.status(400).json({
+          error: 'El estado especificado no existe en el sistema'
+        });
+      }
+
+      // VALIDACIÓN ESPECIAL: Si se intenta poner disponible, verificar stock
+      if (parseInt(estado_id) === 1) {
+        const [stockTotal] = await connection.execute(`
+          SELECT COALESCE(SUM(pd.stock), 0) as stock_total
+          FROM producto_detalle pd
+          WHERE pd.producto_id_producto = ?
+        `, [id]);
+
+        if (stockTotal[0].stock_total === 0) {
+          await connection.rollback();
+          return res.status(400).json({
+            error: 'No se puede marcar como disponible un producto sin stock',
+            nota: 'Agregue stock al producto primero'
+          });
+        }
+      }
+
+      // Obtener todas las variantes del producto
+      const [variantes] = await connection.execute(
+        'SELECT id_detalle_producto FROM producto_detalle WHERE producto_id_producto = ?',
+        [id]
+      );
+
+      if (variantes.length === 0) {
+        await connection.rollback();
+        return res.status(400).json({
+          error: 'No se encontraron variantes para este producto'
+        });
+      }
+
+      // Insertar nuevo estado para todas las variantes
+      const descripcionEstado = `Estado cambiado a ${estadoExiste[0].nombre_estado} desde actualización de datos básicos - ${new Date().toLocaleString()}`;
+      
+      for (const variante of variantes) {
+        await connection.execute(`
+          INSERT INTO detalle_estado_pro (
+            fecha_cb_estado,
+            descripcion_cb_estado,
+            producto_detalle_id_detalle_producto,
+            estado_producto_id_estado
+          ) VALUES (NOW(), ?, ?, ?)
+        `, [descripcionEstado, variante.id_detalle_producto, estado_id]);
+      }
+
+      console.log(`✅ Estado actualizado a ${estadoExiste[0].nombre_estado} para ${variantes.length} variantes`);
+    }
+
+    await connection.commit();
+
+    console.log('✅ Actualización de datos básicos completada exitosamente');
+
+    res.status(200).json({
+      message: 'Datos básicos del producto actualizados correctamente',
+      producto_id: id,
+      estado_actualizado: estado_id ? true : false
+    });
+
+  } catch (error) {
+    await connection.rollback();
+    console.error('❌ Error al actualizar datos básicos:', error);
+    res.status(500).json({
+      error: 'Error interno del servidor',
+      details: error.message
+    });
+  } finally {
+    connection.release();
+  }
+};
+
+/**
+ * 3. CAMBIAR ESTADO DE PRODUCTO ESPECÍFICO - NUEVO
+ * PUT /api/admin/producto/:id/estado
+ */
+export const cambiarEstadoProducto = async (req, res) => {
+  const connection = await pool.getConnection();
+  
+  try {
+    const { id } = req.params;
+    const { estado_id, descripcion_cambio } = req.body;
+
+    console.log('🔄 Cambiando estado del producto:', {
+      producto_id: id,
+      nuevo_estado: estado_id,
+      descripcion: descripcion_cambio
+    });
+
+    // Validar que se proporcione el estado
+    if (!estado_id) {
+      return res.status(400).json({
+        error: 'El estado_id es obligatorio'
+      });
+    }
+
+    await connection.beginTransaction();
+
+    // Verificar que el producto existe
+    const [productoExiste] = await connection.execute(
+      'SELECT id_producto FROM producto WHERE id_producto = ?',
+      [id]
+    );
+
+    if (productoExiste.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({
+        error: 'Producto no encontrado'
+      });
+    }
+
+    // Validar estado (1=Disponible, 2=Agotado, 3=Inhabilitado)
+    const estadosValidos = [1, 2, 3];
+    if (!estadosValidos.includes(parseInt(estado_id))) {
+      await connection.rollback();
+      return res.status(400).json({
+        error: 'Estado no válido',
+        estados_validos: {
+          1: 'Disponible',
+          2: 'Agotado', 
+          3: 'Inhabilitado'
+        }
+      });
+    }
+
+    // Verificar que el estado existe
+    const [estadoInfo] = await connection.execute(
+      'SELECT id_estado, nombre_estado FROM estado_producto WHERE id_estado = ?',
+      [estado_id]
+    );
+
+    if (estadoInfo.length === 0) {
+      await connection.rollback();
+      return res.status(400).json({
+        error: 'El estado especificado no existe en el sistema'
+      });
+    }
+
+    // Obtener estado actual del producto
+    const [estadoActual] = await connection.execute(`
+      SELECT 
+        ep.id_estado as estado_actual,
+        ep.nombre_estado as nombre_estado_actual
+      FROM detalle_estado_pro dep
+      JOIN producto_detalle pd ON dep.producto_detalle_id_detalle_producto = pd.id_detalle_producto
+      JOIN estado_producto ep ON dep.estado_producto_id_estado = ep.id_estado
+      WHERE pd.producto_id_producto = ?
+      ORDER BY dep.fecha_cb_estado DESC, dep.id_detalle_estado DESC
+      LIMIT 1
+    `, [id]);
+
+    const estadoActualId = estadoActual.length > 0 ? parseInt(estadoActual[0].estado_actual) : null;
+
+    // Verificar si el estado ya es el mismo
+    if (estadoActualId === parseInt(estado_id)) {
+      await connection.rollback();
+      return res.status(400).json({
+        error: `El producto ya está en estado "${estadoInfo[0].nombre_estado}"`
+      });
+    }
+
+    // VALIDACIÓN ESPECIAL: Si se intenta poner disponible, verificar stock
+    if (parseInt(estado_id) === 1) {
+      const [stockTotal] = await connection.execute(`
+        SELECT COALESCE(SUM(pd.stock), 0) as stock_total
+        FROM producto_detalle pd
+        WHERE pd.producto_id_producto = ?
+      `, [id]);
+
+      if (stockTotal[0].stock_total === 0) {
+        await connection.rollback();
+        return res.status(400).json({
+          error: 'No se puede marcar como disponible un producto sin stock'
+        });
+      }
+    }
+
+    // Obtener todas las variantes del producto
+    const [variantes] = await connection.execute(
+      'SELECT id_detalle_producto FROM producto_detalle WHERE producto_id_producto = ?',
+      [id]
+    );
+
+    if (variantes.length === 0) {
+      await connection.rollback();
+      return res.status(400).json({
+        error: 'No se encontraron variantes para este producto'
+      });
+    }
+
+    // Insertar nuevo estado para todas las variantes
+    const descripcionFinal = descripcion_cambio || 
+      `Estado cambiado manualmente a ${estadoInfo[0].nombre_estado} - ${new Date().toLocaleString()}`;
+    
+    for (const variante of variantes) {
+      await connection.execute(`
+        INSERT INTO detalle_estado_pro (
+          fecha_cb_estado,
+          descripcion_cb_estado,
+          producto_detalle_id_detalle_producto,
+          estado_producto_id_estado
+        ) VALUES (NOW(), ?, ?, ?)
+      `, [descripcionFinal, variante.id_detalle_producto, estado_id]);
+    }
+
+    await connection.commit();
+
+    console.log(`✅ Estado cambiado exitosamente de "${estadoActual[0]?.nombre_estado_actual || 'Desconocido'}" a "${estadoInfo[0].nombre_estado}"`);
+
+    res.status(200).json({
+      message: 'Estado del producto cambiado correctamente',
+      producto_id: id,
+      estado_anterior: {
+        id: estadoActualId,
+        nombre: estadoActual[0]?.nombre_estado_actual || 'Desconocido'
+      },
+      estado_nuevo: {
+        id: parseInt(estado_id),
+        nombre: estadoInfo[0].nombre_estado
+      },
+      variantes_actualizadas: variantes.length
+    });
+
+  } catch (error) {
+    await connection.rollback();
+    console.error('❌ Error al cambiar estado del producto:', error);
+    res.status(500).json({
+      error: 'Error interno del servidor',
+      details: error.message
+    });
+  } finally {
+    connection.release();
+  }
+};
+
+/**
+ * 4. LISTAR PRODUCTOS CORREGIDO - CON ESTADO CORRECTO
+ * GET /api/admin/productos
+ */
+export const listarProductosCorregido = async (req, res) => {
+  try {
+    console.log('📋 Obteniendo lista de productos...');
+
+    const [productos] = await pool.query(`
+      SELECT 
+        p.id_producto,
+        p.nombre_producto,
+        p.descripcion,
+        p.imagen_url,
+        c.nombre_categoria,
+        
+        -- Datos del detalle del producto
+        pd.id_detalle_producto as id_detalle,
+        pd.precio,
+        pd.stock,
+        m.nombre_marca,
+        t.nombre_talla,
+        
+        -- ESTADO ACTUAL CORREGIDO (el más reciente por producto)
+        estado_actual.estado_id as id_estado,
+        estado_actual.nombre_estado,
+        estado_actual.descripcion_estado,
+        estado_actual.fecha_cb_estado
+        
+      FROM producto p
+      INNER JOIN categoria c ON p.categoria_id_categoria = c.id_categoria
+      INNER JOIN producto_detalle pd ON p.id_producto = pd.producto_id_producto
+      INNER JOIN marca m ON pd.marca_id_marca = m.id_marca
+      INNER JOIN talla t ON pd.talla_id_talla = t.id_talla
+      
+      -- Subconsulta para obtener el estado más reciente de cada producto
+      LEFT JOIN (
+        SELECT 
+          pd_sub.producto_id_producto,
+          ep.id_estado as estado_id,
+          ep.nombre_estado,
+          ep.descripcion_estado,
+          dep.fecha_cb_estado,
+          ROW_NUMBER() OVER (
+            PARTITION BY pd_sub.producto_id_producto 
+            ORDER BY dep.fecha_cb_estado DESC, dep.id_detalle_estado DESC
+          ) as rn
+        FROM producto_detalle pd_sub
+        JOIN detalle_estado_pro dep ON pd_sub.id_detalle_producto = dep.producto_detalle_id_detalle_producto
+        JOIN estado_producto ep ON dep.estado_producto_id_estado = ep.id_estado
+      ) estado_actual ON p.id_producto = estado_actual.producto_id_producto AND estado_actual.rn = 1
+      
+      ORDER BY p.id_producto, pd.id_detalle_producto
+    `);
+
+    console.log(`📋 Productos obtenidos: ${productos.length} registros`);
+
+    // Agregar estado por defecto si no hay estado registrado
+    const productosConEstado = productos.map(producto => ({
+      ...producto,
+      id_estado: producto.id_estado || 1,
+      nombre_estado: producto.nombre_estado || 'Disponible',
+      estado_id: producto.id_estado || 1 // Para compatibilidad
+    }));
+
+    res.json(productosConEstado);
+  } catch (err) {
+    console.error('❌ Error al obtener productos:', err);
+    res.status(500).json({ error: 'Error al obtener productos' });
+  }
+};
+
+/**
+ * 5. OBTENER ESTADOS DE PRODUCTO - TODOS
+ * GET /api/admin/estados-producto
+ */
+export const obtenerEstadosProducto = async (req, res) => {
+  try {
+    console.log('📋 Obteniendo estados de producto...');
+
+    const [estados] = await pool.execute(
+      `SELECT 
+        id_estado, 
+        nombre_estado, 
+        descripcion_estado 
+      FROM estado_producto 
+      ORDER BY id_estado ASC`
+    );
+
+    console.log(`✅ Estados obtenidos: ${estados.length}`);
+
+    res.json(estados);
+  } catch (error) {
+    console.error('❌ Error al obtener estados de producto:', error);
+    res.status(500).json({ error: 'Error al obtener los estados de producto' });
+  }
+};
+
+/**
+ * 6. APLICAR LÓGICA AUTOMÁTICA DE ESTADOS - NUEVO
+ * POST /api/admin/productos/aplicar-logica-automatica
+ */
+export const aplicarLogicaAutomaticaEstados = async (req, res) => {
+  const connection = await pool.getConnection();
+  
+  try {
+    console.log('🤖 Aplicando lógica automática de estados...');
+
+    await connection.beginTransaction();
+
+    // Obtener todos los productos con su stock total y estado actual
+    const [productos] = await connection.execute(`
+      SELECT 
+        p.id_producto,
+        p.nombre_producto,
+        COALESCE(SUM(pd.stock), 0) as stock_total,
+        estado_actual.estado_id as estado_actual_id,
+        estado_actual.nombre_estado as estado_actual_nombre
+      FROM producto p
+      LEFT JOIN producto_detalle pd ON p.id_producto = pd.producto_id_producto
+      
+      -- Obtener estado actual de cada producto
+      LEFT JOIN (
+        SELECT 
+          pd_sub.producto_id_producto,
+          ep.id_estado as estado_id,
+          ep.nombre_estado,
+          ROW_NUMBER() OVER (
+            PARTITION BY pd_sub.producto_id_producto 
+            ORDER BY dep.fecha_cb_estado DESC, dep.id_detalle_estado DESC
+          ) as rn
+        FROM producto_detalle pd_sub
+        JOIN detalle_estado_pro dep ON pd_sub.id_detalle_producto = dep.producto_detalle_id_detalle_producto
+        JOIN estado_producto ep ON dep.estado_producto_id_estado = ep.id_estado
+      ) estado_actual ON p.id_producto = estado_actual.producto_id_producto AND estado_actual.rn = 1
+      
+      GROUP BY p.id_producto, p.nombre_producto, estado_actual.estado_id, estado_actual.nombre_estado
+    `);
+
+    let productosActualizados = 0;
+    const cambios = [];
+
+    for (const producto of productos) {
+      const estadoActual = producto.estado_actual_id || 1; // Por defecto Disponible
+      const stockTotal = parseInt(producto.stock_total);
+      
+      let nuevoEstado = null;
+      
+      // LÓGICA AUTOMÁTICA:
+      // - Si stock = 0 y estado != Inhabilitado → Agotado
+      // - Si stock > 0 y estado = Agotado → Disponible
+      // - No tocar productos Inhabilitados (estado 3)
+      
+      if (estadoActual !== 3) { // Solo si no está inhabilitado
+        if (stockTotal === 0 && estadoActual !== 2) {
+          nuevoEstado = 2; // Cambiar a Agotado
+        } else if (stockTotal > 0 && estadoActual === 2) {
+          nuevoEstado = 1; // Cambiar a Disponible
+        }
+      }
+      
+      if (nuevoEstado && nuevoEstado !== estadoActual) {
+        // Obtener variantes del producto
+        const [variantes] = await connection.execute(
+          'SELECT id_detalle_producto FROM producto_detalle WHERE producto_id_producto = ?',
+          [producto.id_producto]
+        );
+
+        if (variantes.length > 0) {
+          const nombreNuevoEstado = nuevoEstado === 1 ? 'Disponible' : 'Agotado';
+          const descripcion = `Estado actualizado automáticamente a ${nombreNuevoEstado} (Stock: ${stockTotal}) - ${new Date().toLocaleString()}`;
+          
+          // Insertar nuevo estado para todas las variantes
+          for (const variante of variantes) {
+            await connection.execute(`
+              INSERT INTO detalle_estado_pro (
+                fecha_cb_estado,
+                descripcion_cb_estado,
+                producto_detalle_id_detalle_producto,
+                estado_producto_id_estado
+              ) VALUES (NOW(), ?, ?, ?)
+            `, [descripcion, variante.id_detalle_producto, nuevoEstado]);
+          }
+
+          productosActualizados++;
+          cambios.push({
+            id: producto.id_producto,
+            nombre: producto.nombre_producto,
+            estadoAnterior: {
+              id: estadoActual,
+              nombre: producto.estado_actual_nombre || 'Disponible'
+            },
+            estadoNuevo: {
+              id: nuevoEstado,
+              nombre: nombreNuevoEstado
+            },
+            stock: stockTotal,
+            variantes: variantes.length
+          });
+          
+          console.log(`📦 ${producto.nombre_producto}: ${producto.estado_actual_nombre || 'Disponible'} → ${nombreNuevoEstado} (Stock: ${stockTotal})`);
+        }
+      }
+    }
+
+    await connection.commit();
+
+    console.log(`✅ Lógica automática aplicada: ${productosActualizados} productos actualizados`);
+
+    res.status(200).json({
+      message: 'Lógica automática de estados aplicada correctamente',
+      productos_procesados: productos.length,
+      productos_actualizados: productosActualizados,
+      cambios: cambios
+    });
+
+  } catch (error) {
+    await connection.rollback();
+    console.error('❌ Error al aplicar lógica automática:', error);
+    res.status(500).json({
+      error: 'Error interno del servidor',
+      details: error.message
+    });
+  } finally {
+    connection.release();
+  }
+};
+
+// ===== EXPORTAR FUNCIONES CORREGIDAS =====
+// Asegúrate de que estas funciones reemplacen a las existentes en tu archivo de controladores
+// FUNCIÓN CORREGIDA: listarProductos - REEMPLAZA la función existente
+export const listarProductos = async (req, res) => {
+  try {
+    console.log('📋 Obteniendo lista de productos con estados correctos...');
+
+    const [productos] = await pool.query(`
+      SELECT 
+        p.id_producto,
+        p.nombre_producto,
+        p.descripcion,
+        p.imagen_url,
+        c.nombre_categoria,
+        
+        -- Datos del detalle del producto
+        pd.id_detalle_producto as id_detalle,
+        pd.precio,
+        pd.stock,
+        m.nombre_marca,
+        t.nombre_talla,
+        
+        -- ESTADO ACTUAL CORREGIDO - el más reciente por PRODUCTO (no por detalle)
+        COALESCE(estado_producto.id_estado, 1) as id_estado,
+        COALESCE(estado_producto.nombre_estado, 'Disponible') as nombre_estado,
+        COALESCE(estado_producto.descripcion_estado, 'Producto disponible') as descripcion_estado,
+        estado_producto.fecha_cb_estado
+        
+      FROM producto p
+      INNER JOIN categoria c ON p.categoria_id_categoria = c.id_categoria
+      INNER JOIN producto_detalle pd ON p.id_producto = pd.producto_id_producto
+      INNER JOIN marca m ON pd.marca_id_marca = m.id_marca
+      INNER JOIN talla t ON pd.talla_id_talla = t.id_talla
+      
+      -- Subconsulta para obtener el estado más reciente de cada PRODUCTO
+      LEFT JOIN (
+        SELECT 
+          pd_estado.producto_id_producto,
+          ep.id_estado,
+          ep.nombre_estado,
+          ep.descripcion_estado,
+          dep.fecha_cb_estado,
+          ROW_NUMBER() OVER (
+            PARTITION BY pd_estado.producto_id_producto 
+            ORDER BY dep.fecha_cb_estado DESC, dep.id_detalle_estado DESC
+          ) as rn
+        FROM producto_detalle pd_estado
+        INNER JOIN detalle_estado_pro dep ON pd_estado.id_detalle_producto = dep.producto_detalle_id_detalle_producto
+        INNER JOIN estado_producto ep ON dep.estado_producto_id_estado = ep.id_estado
+      ) estado_producto ON p.id_producto = estado_producto.producto_id_producto AND estado_producto.rn = 1
+      
+      ORDER BY p.id_producto, pd.id_detalle_producto
+    `);
+
+    console.log(`📋 Productos obtenidos: ${productos.length} registros`);
+    
+    // Debug: mostrar primeros productos con su estado
+    if (productos.length > 0) {
+      console.log('🔍 Primeros 3 productos con estados:');
+      productos.slice(0, 3).forEach(p => {
+        console.log(`- ${p.nombre_producto}: estado_id=${p.id_estado}, nombre="${p.nombre_estado}"`);
+      });
+    }
+
+    res.json(productos);
+  } catch (err) {
+    console.error('❌ Error al obtener productos:', err);
+    res.status(500).json({ error: 'Error al obtener productos' });
+  }
+};
+
+// FUNCIÓN ADICIONAL: Verificar y corregir estados automáticamente
+export const verificarYCorregirEstados = async (req, res) => {
+  const connection = await pool.getConnection();
+  
+  try {
+    console.log('🔍 Verificando estados de productos...');
+
+    await connection.beginTransaction();
+
+    // Obtener todos los productos con su stock total
+    const [productos] = await connection.execute(`
+      SELECT 
+        p.id_producto,
+        p.nombre_producto,
+        COALESCE(SUM(pd.stock), 0) as stock_total
+      FROM producto p
+      LEFT JOIN producto_detalle pd ON p.id_producto = pd.producto_id_producto
+      GROUP BY p.id_producto, p.nombre_producto
+    `);
+
+    let productosCorregidos = 0;
+
+    for (const producto of productos) {
+      // Obtener estado actual
+      const [estadoActual] = await connection.execute(`
+        SELECT ep.id_estado, ep.nombre_estado
+        FROM detalle_estado_pro dep
+        INNER JOIN producto_detalle pd ON dep.producto_detalle_id_detalle_producto = pd.id_detalle_producto
+        INNER JOIN estado_producto ep ON dep.estado_producto_id_estado = ep.id_estado
+        WHERE pd.producto_id_producto = ?
+        ORDER BY dep.fecha_cb_estado DESC, dep.id_detalle_estado DESC
+        LIMIT 1
+      `, [producto.id_producto]);
+
+      if (estadoActual.length === 0) {
+        // Si no tiene estado, asignar "Disponible" por defecto
+        const [variantes] = await connection.execute(
+          'SELECT id_detalle_producto FROM producto_detalle WHERE producto_id_producto = ?',
+          [producto.id_producto]
+        );
+
+        for (const variante of variantes) {
+          await connection.execute(`
+            INSERT INTO detalle_estado_pro (
+              fecha_cb_estado, 
+              descripcion_cb_estado, 
+              producto_detalle_id_detalle_producto, 
+              estado_producto_id_estado
+            ) VALUES (NOW(), 'Estado inicial asignado automáticamente', ?, 1)
+          `, [variante.id_detalle_producto]);
+        }
+
+        productosCorregidos++;
+        console.log(`✅ Estado inicial asignado a: ${producto.nombre_producto}`);
+      } else {
+        const estadoActualId = estadoActual[0].id_estado;
+        const stockTotal = parseInt(producto.stock_total);
+
+        // Aplicar lógica automática solo si no está inhabilitado
+        let nuevoEstado = null;
+        
+        if (estadoActualId !== 3) { // No es inhabilitado
+          if (stockTotal === 0 && estadoActualId !== 2) {
+            nuevoEstado = 2; // Cambiar a Agotado
+          } else if (stockTotal > 0 && estadoActualId === 2) {
+            nuevoEstado = 1; // Cambiar a Disponible
+          }
+        }
+
+        if (nuevoEstado && nuevoEstado !== estadoActualId) {
+          const [variantes] = await connection.execute(
+            'SELECT id_detalle_producto FROM producto_detalle WHERE producto_id_producto = ?',
+            [producto.id_producto]
+          );
+
+          const nombreNuevoEstado = nuevoEstado === 1 ? 'Disponible' : 'Agotado';
+          
+          for (const variante of variantes) {
+            await connection.execute(`
+              INSERT INTO detalle_estado_pro (
+                fecha_cb_estado, 
+                descripcion_cb_estado, 
+                producto_detalle_id_detalle_producto, 
+                estado_producto_id_estado
+              ) VALUES (NOW(), ?, ?, ?)
+            `, [
+              `Estado corregido automáticamente a ${nombreNuevoEstado} (Stock: ${stockTotal})`,
+              variante.id_detalle_producto,
+              nuevoEstado
+            ]);
+          }
+
+          productosCorregidos++;
+          console.log(`🔄 ${producto.nombre_producto}: ${estadoActual[0].nombre_estado} → ${nombreNuevoEstado}`);
+        }
+      }
+    }
+
+    await connection.commit();
+
+    console.log(`✅ Verificación completada: ${productosCorregidos} productos corregidos`);
+
+    res.json({
+      success: true,
+      message: 'Estados verificados y corregidos',
+      productos_procesados: productos.length,
+      productos_corregidos: productosCorregidos
+    });
+
+  } catch (error) {
+    await connection.rollback();
+    console.error('❌ Error al verificar estados:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al verificar estados',
+      details: error.message
+    });
+  } finally {
+    connection.release();
+  }
+};
+
+// FUNCIÓN DE MANTENIMIENTO: Limpiar estados inconsistentes
+export const limpiarEstadosInconsistentes = async (req, res) => {
+  const connection = await pool.getConnection();
+  
+  try {
+    console.log('🧹 Limpiando estados inconsistentes...');
+
+    await connection.beginTransaction();
+
+    // Eliminar estados huérfanos (sin producto_detalle válido)
+    const [estadosHuerfanos] = await connection.execute(`
+      DELETE dep FROM detalle_estado_pro dep
+      LEFT JOIN producto_detalle pd ON dep.producto_detalle_id_detalle_producto = pd.id_detalle_producto
+      WHERE pd.id_detalle_producto IS NULL
+    `);
+
+    console.log(`🗑️ Eliminados ${estadosHuerfanos.affectedRows} estados huérfanos`);
+
+    // Asegurar que todos los productos tengan al menos un estado
+    const [productosSinEstado] = await connection.execute(`
+      SELECT DISTINCT p.id_producto, p.nombre_producto
+      FROM producto p
+      INNER JOIN producto_detalle pd ON p.id_producto = pd.producto_id_producto
+      LEFT JOIN detalle_estado_pro dep ON pd.id_detalle_producto = dep.producto_detalle_id_detalle_producto
+      WHERE dep.id_detalle_estado IS NULL
+    `);
+
+    let estadosCreados = 0;
+    
+    for (const producto of productosSinEstado) {
+      const [variantes] = await connection.execute(
+        'SELECT id_detalle_producto FROM producto_detalle WHERE producto_id_producto = ?',
+        [producto.id_producto]
+      );
+
+      for (const variante of variantes) {
+        await connection.execute(`
+          INSERT INTO detalle_estado_pro (
+            fecha_cb_estado, 
+            descripcion_cb_estado, 
+            producto_detalle_id_detalle_producto, 
+            estado_producto_id_estado
+          ) VALUES (NOW(), 'Estado creado durante limpieza de inconsistencias', ?, 1)
+        `, [variante.id_detalle_producto]);
+        
+        estadosCreados++;
+      }
+
+      console.log(`✅ Estados creados para: ${producto.nombre_producto}`);
+    }
+
+    await connection.commit();
+
+    console.log(`✅ Limpieza completada: ${estadosCreados} estados creados`);
+
+    res.json({
+      success: true,
+      message: 'Estados inconsistentes limpiados',
+      estados_huerfanos_eliminados: estadosHuerfanos.affectedRows,
+      estados_creados: estadosCreados
+    });
+
+  } catch (error) {
+    await connection.rollback();
+    console.error('❌ Error al limpiar estados:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al limpiar estados inconsistentes',
+      details: error.message
+    });
+  } finally {
+    connection.release();
   }
 };

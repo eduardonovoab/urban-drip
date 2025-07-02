@@ -9,6 +9,11 @@ const ProductosPorCategoria = () => {
   const [totalProductos, setTotalProductos] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [estadisticas, setEstadisticas] = useState({
+    disponibles: 0,
+    agotados: 0,
+    total: 0
+  });
 
   useEffect(() => {
     const cargarDatos = async () => {
@@ -20,41 +25,41 @@ const ProductosPorCategoria = () => {
           throw new Error('ID de categoría no válido');
         }
 
-        console.log('🔍 Cargando productos con detalles para categoría:', id);
+        console.log('🔍 Cargando productos activos con detalles para categoría:', id);
 
-        // URL corregida según las nuevas rutas del backend
-        const url = `http://localhost:3000/api/productos/categoria/${id}/con-detalles`;
+        // NUEVA URL que filtra por estados activos
+        const url = `http://localhost:3000/api/productos/categoria/${id}/activos-con-detalles`;
         console.log('🌐 URL de solicitud:', url);
 
-        const productosResponse = await fetch(url);
+        const response = await fetch(url);
 
-        if (!productosResponse.ok) {
-          const errorText = await productosResponse.text();
+        if (!response.ok) {
+          const errorText = await response.text();
           console.error('Error del servidor:', errorText);
-          throw new Error(`Error del servidor: ${productosResponse.status} - ${productosResponse.statusText}`);
+          throw new Error(`Error del servidor: ${response.status} - ${response.statusText}`);
         }
 
-        const data = await productosResponse.json();
+        const data = await response.json();
         console.log('✅ Datos recibidos del servidor:', data);
 
-        // Verificar la estructura de la respuesta
-        if (!data || typeof data !== 'object') {
+        if (!data || !data.success) {
           throw new Error('Respuesta del servidor inválida');
         }
 
-        // Extraer datos de la respuesta
         const productosData = data.productos || [];
         const categoriaNombre = data.categoria || 'Categoría';
         const totalProductos = data.total_productos || productosData.length;
 
+        // Calcular estadísticas
+        const stats = calcularEstadisticas(productosData);
+
         console.log(`✅ ${productosData.length} productos encontrados`);
-        if (productosData.length > 0) {
-          console.log('📋 Estructura de producto ejemplo:', productosData[0]);
-        }
+        console.log('📊 Estadísticas:', stats);
 
         setProductos(productosData);
         setNombreCategoria(categoriaNombre);
         setTotalProductos(totalProductos);
+        setEstadisticas(stats);
 
       } catch (err) {
         console.error('❌ Error al cargar datos:', err);
@@ -62,6 +67,7 @@ const ProductosPorCategoria = () => {
         setProductos([]);
         setNombreCategoria('Categoría');
         setTotalProductos(0);
+        setEstadisticas({ disponibles: 0, agotados: 0, total: 0 });
       } finally {
         setLoading(false);
       }
@@ -70,9 +76,21 @@ const ProductosPorCategoria = () => {
     cargarDatos();
   }, [id]);
 
+  // Función para calcular estadísticas de productos
+  const calcularEstadisticas = (productos) => {
+    const disponibles = productos.filter(p => p.esta_disponible).length;
+    const agotados = productos.filter(p => p.esta_agotado).length;
+    
+    return {
+      disponibles,
+      agotados,
+      total: productos.length
+    };
+  };
+
   // Función para formatear precio mejorada
   const formatearPrecio = (producto) => {
-    if (!producto.tiene_detalles || producto.total_detalles === 0) {
+    if (!producto.total_detalles || producto.total_detalles === 0) {
       return 'Consultar precio';
     }
 
@@ -100,28 +118,58 @@ const ProductosPorCategoria = () => {
     return `${formatear(precioMin)} - ${formatear(precioMax)}`;
   };
 
-  // Función para obtener información de stock
-  const obtenerInfoStock = (producto) => {
-    if (!producto.tiene_detalles || producto.total_detalles === 0) {
-      return { disponible: false, texto: 'Sin información de stock', clase: 'sin-info' };
+  // Función para obtener información de disponibilidad MEJORADA
+  const obtenerInfoDisponibilidad = (producto) => {
+    // Si está agotado (sin stock)
+    if (producto.esta_agotado || producto.stock_total === 0) {
+      return { 
+        disponible: false, 
+        texto: 'Agotado', 
+        clase: 'agotado',
+        descripcion: 'Este producto no tiene stock disponible actualmente'
+      };
     }
 
-    const stockTotal = producto.stock_total || 0;
-    
-    if (stockTotal === 0) {
-      return { disponible: false, texto: 'Sin stock', clase: 'sin-stock' };
+    // Si está disponible
+    if (producto.esta_disponible && producto.stock_total > 0) {
+      if (producto.stock_total <= 5) {
+        return { 
+          disponible: true, 
+          texto: `¡Solo ${producto.stock_total} disponibles!`, 
+          clase: 'stock-bajo',
+          descripcion: 'Stock limitado'
+        };
+      }
+
+      if (producto.stock_total <= 15) {
+        return { 
+          disponible: true, 
+          texto: `${producto.stock_total} disponibles`, 
+          clase: 'stock-medio',
+          descripcion: 'Stock disponible'
+        };
+      }
+
+      return { 
+        disponible: true, 
+        texto: 'Disponible', 
+        clase: 'stock-ok',
+        descripcion: 'En stock'
+      };
     }
 
-    if (stockTotal <= 5) {
-      return { disponible: true, texto: `¡Últimas ${stockTotal} unidades!`, clase: 'stock-bajo' };
-    }
-
-    return { disponible: true, texto: `${stockTotal} disponibles`, clase: 'stock-ok' };
+    // Fallback
+    return { 
+      disponible: false, 
+      texto: 'Sin información', 
+      clase: 'sin-info',
+      descripcion: 'Estado no determinado'
+    };
   };
 
   // Función para obtener resumen de variantes
   const obtenerResumenVariantes = (producto) => {
-    if (!producto.tiene_detalles || producto.total_detalles === 0) {
+    if (!producto.total_detalles || producto.total_detalles === 0) {
       return 'Sin variantes';
     }
 
@@ -175,13 +223,13 @@ const ProductosPorCategoria = () => {
     return (
       <div className="empty">
         <h3>No hay productos disponibles</h3>
-        <p>No se encontraron productos con detalles en la categoría "{nombreCategoria}"</p>
+        <p>No se encontraron productos disponibles o agotados en la categoría "{nombreCategoria}"</p>
         <div className="empty-info">
-          <p>Posibles causas:</p>
+          <p>Esta categoría podría tener:</p>
           <ul>
-            <li>La categoría no tiene productos con detalles configurados</li>
-            <li>Los productos no tienen precio ni stock asignados</li>
-            <li>Error en la conexión con la base de datos</li>
+            <li>Productos temporalmente inhabilitados</li>
+            <li>Productos sin detalles de precio o stock configurados</li>
+            <li>Sin productos agregados aún</li>
           </ul>
         </div>
         <Link to="/" className="btn-volver">
@@ -198,98 +246,160 @@ const ProductosPorCategoria = () => {
           ← Volver al inicio
         </Link>
         <h2>{nombreCategoria}</h2>
-        <p className="productos-count">
-          {totalProductos} {totalProductos === 1 ? 'producto' : 'productos'} disponible{totalProductos === 1 ? '' : 's'}
-        </p>
+        <div className="categoria-stats">
+          <p className="productos-count">
+            {totalProductos} {totalProductos === 1 ? 'producto' : 'productos'} encontrado{totalProductos === 1 ? '' : 's'}
+          </p>
+          <div className="stats-breakdown">
+            <span className="stat-disponibles">
+              {estadisticas.disponibles} disponible{estadisticas.disponibles !== 1 ? 's' : ''}
+            </span>
+            {estadisticas.agotados > 0 && (
+              <span className="stat-agotados">
+                {estadisticas.agotados} agotado{estadisticas.agotados !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
+      {/* Ordenar productos: disponibles primero, luego agotados */}
       <div className="productos-grid">
-        {productos.map((producto) => {
-          const stockInfo = obtenerInfoStock(producto);
-          const resumenVariantes = obtenerResumenVariantes(producto);
-          
-          return (
-            <div 
-              key={`producto-${producto.id_producto}`} 
-              className={`producto-card ${!stockInfo.disponible ? 'sin-stock' : ''}`}
-            >
-              <Link to={`/producto/detalle/${producto.id_producto}`}>
-                <div className="producto-imagen">
-                  <img
-                    src={producto.imagen_url || '/images/placeholder-product.jpg'}
-                    alt={producto.nombre_producto}
-                    loading="lazy"
-                    onError={(e) => {
-                      e.target.src = '/images/placeholder-product.jpg';
-                    }}
-                  />
-                  {/* Badge de cantidad de variantes */}
-                  {producto.total_detalles > 1 && (
-                    <div className="variantes-badge">
-                      {producto.total_detalles} variantes
-                    </div>
-                  )}
-                </div>
-
-                <div className="producto-info">
-                  <h3 className="producto-nombre">{producto.nombre_producto}</h3>
-                  
-                  {producto.descripcion && (
-                    <p className="producto-descripcion">{producto.descripcion}</p>
-                  )}
-
-                  <p className="producto-precio">
-                    {formatearPrecio(producto)}
-                  </p>
-
-                  <div className="producto-extras">
-                    <p className={`producto-stock ${stockInfo.clase}`}>
-                      {stockInfo.texto}
-                    </p>
-
-                    {resumenVariantes && resumenVariantes !== 'Sin variantes' && (
-                      <p className="producto-variantes">
-                        {resumenVariantes}
-                      </p>
+        {productos
+          .sort((a, b) => {
+            // Disponibles primero
+            if (a.esta_disponible && !b.esta_disponible) return -1;
+            if (!a.esta_disponible && b.esta_disponible) return 1;
+            // Luego por nombre
+            return a.nombre_producto.localeCompare(b.nombre_producto);
+          })
+          .map((producto) => {
+            const disponibilidadInfo = obtenerInfoDisponibilidad(producto);
+            const resumenVariantes = obtenerResumenVariantes(producto);
+            
+            return (
+              <div 
+                key={`producto-${producto.id_producto}`} 
+                className={`producto-card ${
+                  producto.esta_agotado ? 'producto-agotado' : ''
+                } ${
+                  producto.esta_disponible ? 'producto-disponible' : ''
+                }`}
+              >
+                <Link to={`/producto/detalle/${producto.id_producto}`}>
+                  <div className="producto-imagen">
+                    <img
+                      src={producto.imagen_url || '/images/placeholder-product.jpg'}
+                      alt={producto.nombre_producto}
+                      loading="lazy"
+                      onError={(e) => {
+                        e.target.src = '/images/placeholder-product.jpg';
+                      }}
+                    />
+                    
+                    {/* Badge de estado prominente */}
+                    {producto.esta_agotado && (
+                      <div className="estado-badge agotado-badge">
+                        <span className="agotado-text">AGOTADO</span>
+                      </div>
                     )}
-
-                    {/* Mostrar marcas si hay más de una */}
-                    {producto.marcas_disponibles && producto.marcas_disponibles.length > 0 && (
-                      <p className="producto-marcas">
-                        {producto.marcas_disponibles.slice(0, 2).join(', ')}
-                        {producto.marcas_disponibles.length > 2 && ` +${producto.marcas_disponibles.length - 2} más`}
-                      </p>
+                    
+                    {/* Badge de variantes */}
+                    {producto.total_detalles > 1 && (
+                      <div className="variantes-badge">
+                        {producto.total_detalles} variantes
+                      </div>
                     )}
-
-                    {/* Mostrar tallas si hay más de una */}
-                    {producto.tallas_disponibles && producto.tallas_disponibles.length > 0 && (
-                      <p className="producto-tallas">
-                        Tallas: {producto.tallas_disponibles.slice(0, 4).join(', ')}
-                        {producto.tallas_disponibles.length > 4 && ` +${producto.tallas_disponibles.length - 4} más`}
-                      </p>
+                    
+                    {/* Badge de stock bajo para disponibles */}
+                    {producto.esta_disponible && producto.stock_total <= 5 && (
+                      <div className="stock-bajo-badge">
+                        ¡Solo {producto.stock_total}!
+                      </div>
                     )}
                   </div>
-                </div>
-              </Link>
 
-              {/* Botón rápido para ver detalles */}
-              <div className="producto-actions">
-                <Link 
-                  to={`/producto/detalle/${producto.id_producto}`}
-                  className={`btn-ver-detalles ${!stockInfo.disponible ? 'disabled' : ''}`}
-                >
-                  {stockInfo.disponible ? 'Ver detalles' : 'Sin stock'}
+                  <div className="producto-info">
+                    <h3 className="producto-nombre">{producto.nombre_producto}</h3>
+                    
+                    {producto.descripcion && (
+                      <p className="producto-descripcion">{producto.descripcion}</p>
+                    )}
+
+                    <p className={`producto-precio ${producto.esta_agotado ? 'precio-agotado' : ''}`}>
+                      {formatearPrecio(producto)}
+                    </p>
+
+                    <div className="producto-extras">
+                      <p className={`producto-stock ${disponibilidadInfo.clase}`}>
+                        {disponibilidadInfo.texto}
+                      </p>
+
+                      {resumenVariantes && resumenVariantes !== 'Sin variantes' && (
+                        <p className="producto-variantes">
+                          {resumenVariantes}
+                        </p>
+                      )}
+
+                      {/* Mostrar marcas si hay más de una */}
+                      {producto.marcas_disponibles && producto.marcas_disponibles.length > 0 && (
+                        <p className="producto-marcas">
+                          {producto.marcas_disponibles.slice(0, 2).join(', ')}
+                          {producto.marcas_disponibles.length > 2 && ` +${producto.marcas_disponibles.length - 2} más`}
+                        </p>
+                      )}
+
+                      {/* Mostrar tallas si hay más de una */}
+                      {producto.tallas_disponibles && producto.tallas_disponibles.length > 0 && (
+                        <p className="producto-tallas">
+                          Tallas: {producto.tallas_disponibles.slice(0, 4).join(', ')}
+                          {producto.tallas_disponibles.length > 4 && ` +${producto.tallas_disponibles.length - 4} más`}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </Link>
+
+                {/* Botón de acción mejorado */}
+                <div className="producto-actions">
+                  <Link 
+                    to={`/producto/detalle/${producto.id_producto}`}
+                    className={`btn-ver-detalles ${
+                      producto.esta_agotado ? 'btn-agotado' : 'btn-disponible'
+                    }`}
+                  >
+                    {producto.esta_agotado ? (
+                      <>
+                        <span className="btn-icon">👁️</span>
+                        Ver producto
+                      </>
+                    ) : (
+                      <>
+                        <span className="btn-icon">🛒</span>
+                        Ver detalles
+                      </>
+                    )}
+                  </Link>
+                  
+                  {/* Mensaje adicional para agotados */}
+                  {producto.esta_agotado && (
+                    <p className="mensaje-agotado">
+                      Notificaremos cuando esté disponible
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
       </div>
 
-      {/* Información adicional */}
+      {/* Footer mejorado con información */}
       <div className="categoria-footer">
         <p className="categoria-info">
-          Mostrando productos con precio y stock disponibles en {nombreCategoria}
+          Mostrando productos disponibles y agotados en {nombreCategoria}
+        </p>
+        <p className="categoria-note">
+          Los productos inhabilitados no se muestran en esta vista
         </p>
       </div>
     </section>

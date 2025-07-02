@@ -1,37 +1,85 @@
 import express from 'express';
 import { 
-  getProductosAgrupadosConDetalles,
-  getProductoById, 
-  getAllProductos, 
-  getStockProducto,
+  // Controladores principales
+  getProductoById,
+  getAllProductos,
   getproductodetalle,
+  
+  // Controladores por categoría
+  getProductosAgrupadosConDetalles,
+  getProductosActivosPorCategoria,
+  getProductosPorCategoria,
+  
+  // Controladores por marca
   getProductosPorMarca,
-  obtenerCategorias, // Nueva ruta
-  obtenerMarcas // Nueva ruta
+  getProductosActivosPorMarca,
+  
+  // Controladores por talla
+  getProductosPorTalla,
+  
+  // Controladores de stock
+  getStockProducto,
+  
+  // Controladores de catálogos
+  obtenerCategorias,
+  getProductosActivosConDetallesPorCategoria,
+
+  obtenerMarcas,
+
+  
+  // Controladores especializados
+  getProductosDestacadosActivos,
+  getTodosProductosActivos
 } from '../controllers/productoController.js';
 
 const router = express.Router();
 
+// ========== MIDDLEWARE ==========
+
 // Middleware de logging
 router.use((req, res, next) => {
-  console.log(`PRODUCTOS: ${req.method} ${req.path}`);
+  console.log(`PRODUCTOS: ${req.method} ${req.path} - ${new Date().toISOString()}`);
   next();
 });
 
 console.log('🔍 Iniciando definición de rutas de productos...');
 
-// Ruta de salud para productos
+// ========== RUTAS DE SALUD ==========
+
+/**
+ * Ruta de salud para productos
+ * GET /api/productos/health
+ */
 router.get('/health', (req, res) => {
   res.json({
     status: 'OK',
     service: 'Productos API',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    endpoints_disponibles: [
+      'GET /health - Estado del servicio',
+      'GET /productos-detalles - Todos los productos con detalles',
+      'GET /categorias - Listado de categorías',
+      'GET /marcas - Listado de marcas',
+      'GET /categoria/:id/con-detalles - Productos por categoría con detalles',
+      'GET /categoria/:id/activos - Productos activos por categoría',
+      'GET /marca/:id - Productos por marca',
+      'GET /marca/:id/activos - Productos activos por marca',
+      'GET /talla/:talla - Productos por talla',
+      'GET /destacados/activos - Productos destacados activos',
+      'GET /activos - Todos los productos activos',
+      'GET /:id - Producto específico por ID',
+      'GET /:id/stock - Stock de producto específico',
+      'GET / - Todos los productos'
+    ]
   });
 });
 
-// ========== RUTAS ESPECÍFICAS PRIMERO (más específicas a menos específicas) ==========
+// ========== RUTAS ESPECIALIZADAS (MÁS ESPECÍFICAS PRIMERO) ==========
 
-// Ruta para obtener todos los productos con detalles
+/**
+ * Obtener todos los productos con detalles
+ * GET /api/productos/productos-detalles
+ */
 router.get('/productos-detalles', async (req, res) => {
   try {
     console.log('🔍 Ejecutando ruta: /productos-detalles');
@@ -45,13 +93,16 @@ router.get('/productos-detalles', async (req, res) => {
   }
 });
 
-// Ruta para obtener productos por categoría CON detalles
-router.get('/categoria/:id/con-detalles', async (req, res) => {
+/**
+ * Obtener productos destacados activos
+ * GET /api/productos/destacados/activos
+ */
+router.get('/destacados/activos', async (req, res) => {
   try {
-    console.log(`🔍 Ejecutando ruta: /categoria/${req.params.id}/con-detalles`);
-    await getProductosAgrupadosConDetalles(req, res);
+    console.log('🔍 Ejecutando ruta: /destacados/activos');
+    await getProductosDestacadosActivos(req, res);
   } catch (error) {
-    console.error(`❌ Error en /categoria/${req.params.id}/con-detalles:`, error);
+    console.error('❌ Error en /destacados/activos:', error);
     res.status(500).json({ 
       error: 'Error interno del servidor',
       message: error.message 
@@ -59,13 +110,16 @@ router.get('/categoria/:id/con-detalles', async (req, res) => {
   }
 });
 
-// Ruta para obtener productos por marca
-router.get('/marca/:id', async (req, res) => {
+/**
+ * Obtener todos los productos activos
+ * GET /api/productos/activos
+ */
+router.get('/activos', async (req, res) => {
   try {
-    console.log(`🔍 Ejecutando ruta: /marca/${req.params.id}`);
-    await getProductosPorMarca(req, res);
+    console.log('🔍 Ejecutando ruta: /activos');
+    await getTodosProductosActivos(req, res);
   } catch (error) {
-    console.error(`❌ Error en /marca/${req.params.id}:`, error);
+    console.error('❌ Error en /activos:', error);
     res.status(500).json({ 
       error: 'Error interno del servidor',
       message: error.message 
@@ -73,23 +127,12 @@ router.get('/marca/:id', async (req, res) => {
   }
 });
 
-// Ruta para obtener stock de un producto específico
-router.get('/:id/stock', async (req, res) => {
-  try {
-    console.log(`🔍 Ejecutando ruta: /${req.params.id}/stock`);
-    await getStockProducto(req, res);
-  } catch (error) {
-    console.error(`❌ Error en /${req.params.id}/stock:`, error);
-    res.status(500).json({ 
-      error: 'Error interno del servidor',
-      message: error.message 
-    });
-  }
-});
+// ========== RUTAS DE CATÁLOGOS ==========
 
-// ========== NUEVAS RUTAS GENERALES ==========
-
-// Ruta para obtener todas las categorías
+/**
+ * Obtener todas las categorías
+ * GET /api/productos/categorias
+ */
 router.get('/categorias', async (req, res) => {
   try {
     console.log('🔍 Ejecutando ruta: /categorias');
@@ -103,7 +146,10 @@ router.get('/categorias', async (req, res) => {
   }
 });
 
-// Ruta para obtener todas las marcas
+/**
+ * Obtener todas las marcas
+ * GET /api/productos/marcas
+ */
 router.get('/marcas', async (req, res) => {
   try {
     console.log('🔍 Ejecutando ruta: /marcas');
@@ -117,7 +163,137 @@ router.get('/marcas', async (req, res) => {
   }
 });
 
-// Ruta para obtener un producto específico por ID
+// ========== RUTAS POR CATEGORÍA ==========
+
+/**
+ * Obtener productos por categoría CON detalles completos
+ * GET /api/productos/categoria/:id/con-detalles
+ */
+router.get('/categoria/:id/con-detalles', async (req, res) => {
+  try {
+    console.log(`🔍 Ejecutando ruta: /categoria/${req.params.id}/con-detalles`);
+    await getProductosAgrupadosConDetalles(req, res);
+  } catch (error) {
+    console.error(`❌ Error en /categoria/${req.params.id}/con-detalles:`, error);
+    res.status(500).json({ 
+      error: 'Error interno del servidor',
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * Obtener productos activos por categoría (excluye inhabilitados)
+ * GET /api/productos/categoria/:id/activos
+ */
+router.get('/categoria/:id/activos', async (req, res) => {
+  try {
+    console.log(`🔍 Ejecutando ruta: /categoria/${req.params.id}/activos`);
+    await getProductosActivosPorCategoria(req, res);
+  } catch (error) {
+    console.error(`❌ Error en /categoria/${req.params.id}/activos:`, error);
+    res.status(500).json({ 
+      error: 'Error interno del servidor',
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * Obtener productos por categoría (versión simple)
+ * GET /api/productos/categoria/:id
+ */
+router.get('/categoria/:id', async (req, res) => {
+  try {
+    console.log(`🔍 Ejecutando ruta: /categoria/${req.params.id}`);
+    await getProductosPorCategoria(req, res);
+  } catch (error) {
+    console.error(`❌ Error en /categoria/${req.params.id}:`, error);
+    res.status(500).json({ 
+      error: 'Error interno del servidor',
+      message: error.message 
+    });
+  }
+});
+
+// ========== RUTAS POR MARCA ==========
+
+/**
+ * Obtener productos activos por marca (excluye inhabilitados)
+ * GET /api/productos/marca/:id/activos
+ */
+router.get('/marca/:id/activos', async (req, res) => {
+  try {
+    console.log(`🔍 Ejecutando ruta: /marca/${req.params.id}/activos`);
+    await getProductosActivosPorMarca(req, res);
+  } catch (error) {
+    console.error(`❌ Error en /marca/${req.params.id}/activos:`, error);
+    res.status(500).json({ 
+      error: 'Error interno del servidor',
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * Obtener productos por marca
+ * GET /api/productos/marca/:id
+ */
+router.get('/marca/:id', async (req, res) => {
+  try {
+    console.log(`🔍 Ejecutando ruta: /marca/${req.params.id}`);
+    await getProductosPorMarca(req, res);
+  } catch (error) {
+    console.error(`❌ Error en /marca/${req.params.id}:`, error);
+    res.status(500).json({ 
+      error: 'Error interno del servidor',
+      message: error.message 
+    });
+  }
+});
+
+// ========== RUTAS POR TALLA ==========
+
+/**
+ * Obtener productos por talla
+ * GET /api/productos/talla/:talla
+ */
+router.get('/talla/:talla', async (req, res) => {
+  try {
+    console.log(`🔍 Ejecutando ruta: /talla/${req.params.talla}`);
+    await getProductosPorTalla(req, res);
+  } catch (error) {
+    console.error(`❌ Error en /talla/${req.params.talla}:`, error);
+    res.status(500).json({ 
+      error: 'Error interno del servidor',
+      message: error.message 
+    });
+  }
+});
+
+// ========== RUTAS ESPECÍFICAS POR ID ==========
+
+/**
+ * Obtener stock de un producto específico
+ * GET /api/productos/:id/stock
+ */
+router.get('/:id/stock', async (req, res) => {
+  try {
+    console.log(`🔍 Ejecutando ruta: /${req.params.id}/stock`);
+    await getStockProducto(req, res);
+  } catch (error) {
+    console.error(`❌ Error en /${req.params.id}/stock:`, error);
+    res.status(500).json({ 
+      error: 'Error interno del servidor',
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * Obtener producto específico por ID
+ * GET /api/productos/:id
+ */
 router.get('/:id', async (req, res) => {
   try {
     console.log(`🔍 Ejecutando ruta: /${req.params.id}`);
@@ -130,8 +306,30 @@ router.get('/:id', async (req, res) => {
     });
   }
 });
+// Agregar esta ruta ANTES de las rutas existentes de categoría
+/**
+ * Obtener productos activos por categoría CON detalles (solo disponibles y agotados)
+ * GET /api/productos/categoria/:id/activos-con-detalles
+ */
+router.get('/categoria/:id/activos-con-detalles', async (req, res) => {
+  try {
+    console.log(`🔍 Ejecutando ruta: /categoria/${req.params.id}/activos-con-detalles`);
+    await getProductosActivosConDetallesPorCategoria(req, res);
+  } catch (error) {
+    console.error(`❌ Error en /categoria/${req.params.id}/activos-con-detalles:`, error);
+    res.status(500).json({ 
+      error: 'Error interno del servidor',
+      message: error.message 
+    });
+  }
+});
 
-// Ruta para obtener todos los productos (debe ir al final)
+// ========== RUTA GENERAL (DEBE IR AL FINAL) ==========
+
+/**
+ * Obtener todos los productos (debe ir al final para evitar conflictos)
+ * GET /api/productos/
+ */
 router.get('/', async (req, res) => {
   try {
     console.log('🔍 Ejecutando ruta: / (todos los productos)');

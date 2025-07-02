@@ -17,6 +17,7 @@ const EditarProducto = () => {
     categoria_id: '',
     marca_id: '',
     precio_base: '',
+    estado_id: '1', // Por defecto Disponible
     tallas: [{ 
       id_detalle_producto: null, 
       talla_id: '', 
@@ -27,17 +28,17 @@ const EditarProducto = () => {
   };
 
   const [producto, setProducto] = useState(initialProductState);
+  const [estadoManual, setEstadoManual] = useState('1'); // Estado seleccionado manualmente
   const [productoCargado, setProductoCargado] = useState(false);
   const [errores, setErrores] = useState({});
   const [categorias, setCategorias] = useState([]);
   const [tallas, setTallas] = useState([]);
   const [marcas, setMarcas] = useState([]);
+  const [estadosProducto, setEstadosProducto] = useState([]);
   const [loading, setLoading] = useState(false);
   const [tallasEliminadas, setTallasEliminadas] = useState([]);
-  const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
-  const [datosConfirmacion, setDatosConfirmacion] = useState(null);
 
-  // Función para procesar datos del producto con detalles
+  // Función para procesar datos del producto
   const procesarProductoConDetalles = (productosData) => {
     if (!Array.isArray(productosData) || productosData.length === 0) {
       throw new Error('No se encontraron datos del producto');
@@ -58,35 +59,93 @@ const EditarProducto = () => {
       imagen_url: primerElemento.imagen_url || '',
       categoria_id: primerElemento.categoria_id_categoria ? String(primerElemento.categoria_id_categoria) : '',
       nombre_categoria: primerElemento.nombre_categoria || '',
-      estado_id: primerElemento.estado_id,
+      estado_id: primerElemento.estado_id ? String(primerElemento.estado_id) : '1',
       nombre_estado: primerElemento.nombre_estado || '',
       detalles: []
     };
 
     productosData.forEach((registro, index) => {
-      console.log(`📝 Procesando detalle ${index + 1}:`, {
-        id_detalle: registro.id_detalle,
-        marca: registro.nombre_marca,
-        talla: registro.nombre_talla,
-        precio: registro.precio,
-        stock: registro.stock
-      });
+      if (registro.id_detalle) {
+        console.log(`📝 Procesando detalle ${index + 1}:`, {
+          id_detalle: registro.id_detalle,
+          marca: registro.nombre_marca,
+          talla: registro.nombre_talla,
+          precio: registro.precio,
+          stock: registro.stock
+        });
 
-      productoProcesado.detalles.push({
-        id_detalle_producto: registro.id_detalle,
-        marca_id_marca: registro.marca_id_marca,
-        nombre_marca: registro.nombre_marca,
-        talla_id_talla: registro.talla_id_talla,
-        nombre_talla: registro.nombre_talla,
-        precio: registro.precio,
-        stock: registro.stock,
-        estado_detalle: registro.estado_detalle || registro.estado
-      });
+        productoProcesado.detalles.push({
+          id_detalle_producto: registro.id_detalle,
+          marca_id_marca: registro.marca_id_marca,
+          nombre_marca: registro.nombre_marca,
+          talla_id_talla: registro.talla_id_talla,
+          nombre_talla: registro.nombre_talla,
+          precio: registro.precio,
+          stock: registro.stock,
+          estado_detalle: registro.estado_detalle || 'activo'
+        });
+      }
     });
 
     console.log('✅ Producto procesado:', productoProcesado);
     return productoProcesado;
   };
+
+  // FUNCIÓN CLAVE: Calcular stock total del producto
+  const calcularStockTotalProducto = useCallback(() => {
+    return producto.tallas.reduce((total, talla) => {
+      if (talla.es_existente) {
+        const stockActual = parseInt(talla.stock_actual) || 0;
+        const stockAgregar = parseInt(talla.stock_agregar) || 0;
+        return total + stockActual + stockAgregar;
+      } else {
+        return total + (parseInt(talla.stock_agregar) || 0);
+      }
+    }, 0);
+  }, [producto.tallas]);
+
+  // FUNCIÓN CLAVE: Determinar estado automático basado en stock
+  const determinarEstadoAutomatico = useCallback((stockTotal) => {
+    // Si el estado manual es "Inhabilitado", mantenerlo
+    if (estadoManual === '3') {
+      return '3';
+    }
+    
+    // Lógica automática para Disponible/Agotado
+    if (stockTotal === 0) {
+      return '2'; // Agotado
+    } else {
+      return '1'; // Disponible
+    }
+  }, [estadoManual]);
+
+  // FUNCIÓN CLAVE: Actualizar estado del producto cuando cambia el stock
+  const actualizarEstadoPorStock = useCallback(() => {
+    const stockTotal = calcularStockTotalProducto();
+    const nuevoEstado = determinarEstadoAutomatico(stockTotal);
+    
+    console.log('🔄 Actualizando estado por stock:', {
+      stockTotal,
+      estadoManual,
+      estadoActual: producto.estado_id,
+      nuevoEstado
+    });
+
+    // Solo actualizar si el estado cambió
+    if (producto.estado_id !== nuevoEstado) {
+      setProducto(prev => ({
+        ...prev,
+        estado_id: nuevoEstado
+      }));
+
+      // Mostrar notificación del cambio automático
+      if (nuevoEstado === '2') {
+        toast.info('Estado cambiado automáticamente a "Agotado" por falta de stock');
+      } else if (nuevoEstado === '1' && producto.estado_id === '2') {
+        toast.info('Estado cambiado automáticamente a "Disponible" por tener stock');
+      }
+    }
+  }, [calcularStockTotalProducto, determinarEstadoAutomatico, producto.estado_id, estadoManual]);
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -108,7 +167,7 @@ const EditarProducto = () => {
       try {
         console.log('🚀 Iniciando carga de datos para producto ID:', id);
 
-        const [categoriasRes, tallasRes, marcasRes, productoRes] = await Promise.all([
+        const [categoriasRes, tallasRes, marcasRes, estadosRes, productoRes] = await Promise.all([
           axios.get('http://localhost:3000/api/admin/categorias', {
             headers: { Authorization: `Bearer ${token}` },
           }),
@@ -116,6 +175,9 @@ const EditarProducto = () => {
             headers: { Authorization: `Bearer ${token}` },
           }),
           axios.get('http://localhost:3000/api/admin/marcas', {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          axios.get('http://localhost:3000/api/admin/estados-producto', {
             headers: { Authorization: `Bearer ${token}` },
           }),
           axios.get(`http://localhost:3000/api/admin/producto/${id}/edicion`, {
@@ -127,12 +189,14 @@ const EditarProducto = () => {
           categorias: categoriasRes.data?.length || 0,
           tallas: tallasRes.data?.length || 0,
           marcas: marcasRes.data?.length || 0,
+          estados: estadosRes.data?.length || 0,
           producto: productoRes.data
         });
 
         setCategorias(categoriasRes.data || []);
         setTallas(tallasRes.data || []);
         setMarcas(marcasRes.data || []);
+        setEstadosProducto(estadosRes.data || []);
 
         let productData;
         
@@ -142,11 +206,21 @@ const EditarProducto = () => {
           }
           productData = procesarProductoConDetalles(productoRes.data);
         } else if (productoRes.data && typeof productoRes.data === 'object') {
-          productData = productoRes.data;
-          console.log('📋 Datos del producto (objeto):', productData);
+          productData = {
+            id_producto: productoRes.data.id_producto,
+            nombre: productoRes.data.nombre_producto || '',
+            descripcion: productoRes.data.descripcion || '',
+            imagen_url: productoRes.data.imagen_url || '',
+            categoria_id: productoRes.data.categoria_id_categoria ? String(productoRes.data.categoria_id_categoria) : '',
+            estado_id: productoRes.data.estado_id ? String(productoRes.data.estado_id) : '1',
+            detalles: productoRes.data.detalles || []
+          };
         } else {
           throw new Error('Formato de respuesta no válido');
         }
+
+        // Configurar estado manual inicial
+        setEstadoManual(productData.estado_id || '1');
 
         if (productData.detalles && productData.detalles.length > 0) {
           const primerDetalle = productData.detalles[0];
@@ -154,6 +228,7 @@ const EditarProducto = () => {
           console.log('🎯 Configurando producto con detalles:', {
             nombre: productData.nombre,
             categoria_id: productData.categoria_id,
+            estado_id: productData.estado_id,
             primer_detalle: primerDetalle,
             total_detalles: productData.detalles.length
           });
@@ -163,6 +238,7 @@ const EditarProducto = () => {
             descripcion: productData.descripcion || '',
             imagen_url: productData.imagen_url || '',
             categoria_id: productData.categoria_id || '',
+            estado_id: productData.estado_id || '1',
             marca_id: primerDetalle.marca_id_marca ? String(primerDetalle.marca_id_marca) : '',
             precio_base: primerDetalle.precio ? String(primerDetalle.precio) : '',
             tallas: productData.detalles.map(detalle => ({
@@ -182,6 +258,7 @@ const EditarProducto = () => {
             descripcion: productData.descripcion || '',
             imagen_url: productData.imagen_url || '',
             categoria_id: productData.categoria_id || '',
+            estado_id: productData.estado_id || '1',
             marca_id: '',
             precio_base: '',
             tallas: [{ 
@@ -222,6 +299,13 @@ const EditarProducto = () => {
     fetchData();
   }, [navigate, id]);
 
+  // EFECTO CLAVE: Actualizar estado automáticamente cuando cambia el stock
+  useEffect(() => {
+    if (productoCargado) {
+      actualizarEstadoPorStock();
+    }
+  }, [producto.tallas, actualizarEstadoPorStock, productoCargado]);
+
   // Limpiar errores específicos
   const clearError = useCallback((errorKey) => {
     setErrores(prev => {
@@ -241,7 +325,33 @@ const EditarProducto = () => {
     }
   };
 
-  // Manejar cambios en tallas - MODIFICADO para nueva lógica
+  // FUNCIÓN CLAVE: Manejar cambio de estado manual (solo Disponible ↔ Inhabilitado)
+  const handleEstadoChange = (e) => {
+    const nuevoEstado = e.target.value;
+    
+    // NO APLICAR EL CAMBIO INMEDIATAMENTE - solo guardarlo
+    // El cambio se aplicará cuando el usuario confirme con "Actualizar Producto"
+    
+    console.log('🔄 Preparando cambio de estado manual:', {
+      estadoActual: producto.estado_id,
+      nuevoEstado,
+      estadoManualActual: estadoManual
+    });
+
+    // Solo actualizar el estado manual y del producto en el estado local
+    setEstadoManual(nuevoEstado);
+    setProducto(prev => ({ ...prev, estado_id: nuevoEstado }));
+    
+    if (errores.estado_id) {
+      clearError('estado_id');
+    }
+
+    // Mostrar mensaje informativo de que el cambio está pendiente
+    const estadoNombre = getNombreEstado(nuevoEstado);
+    toast.info(`Estado preparado para cambio a "${estadoNombre}". Confirma los cambios para aplicar.`);
+  };
+
+  // Manejar cambios en tallas
   const handleTallaChange = (index, e) => {
     const { name, value } = e.target;
     setProducto(prev => {
@@ -250,6 +360,7 @@ const EditarProducto = () => {
         ...newTallas[index],
         [name]: value,
       };
+      
       return {
         ...prev,
         tallas: newTallas,
@@ -356,7 +467,7 @@ const EditarProducto = () => {
     return urlRegex.test(url);
   };
 
-  // Validar formulario completo - MODIFICADO para nueva lógica
+  // Validar formulario completo
   const validarFormulario = () => {
     let valido = true;
     const nuevosErrores = {};
@@ -387,12 +498,17 @@ const EditarProducto = () => {
       valido = false;
     }
 
+    if (!producto.estado_id) {
+      nuevosErrores.estado_id = 'Selecciona un estado';
+      valido = false;
+    }
+
     if (producto.imagen_url && !validateImageUrl(producto.imagen_url)) {
       nuevosErrores.imagen_url = 'Ingresa una URL válida de imagen';
       valido = false;
     }
 
-    // Validar tallas - NUEVA LÓGICA
+    // Validar tallas
     const tallasUsadas = new Set();
     producto.tallas.forEach((talla, index) => {
       if (!talla.talla_id) {
@@ -428,8 +544,10 @@ const EditarProducto = () => {
     return valido;
   };
 
-  // Mostrar alerta de confirmación
-  const prepararConfirmacion  = () => {
+  // Mostrar alerta de confirmación MEJORADA
+  const prepararConfirmacion = () => {
+    const stockTotal = calcularStockTotalProducto();
+    
     // Preparar información del resumen para mostrar en la confirmación
     const tallasResumen = producto.tallas.map(talla => {
       const nombreTalla = getNombreTalla(talla.talla_id);
@@ -442,24 +560,48 @@ const EditarProducto = () => {
       }
     }).join('\n');
 
-    const mensaje = `¿Estás seguro que quieres actualizar este producto?
+    const nombreEstado = getNombreEstado(producto.estado_id);
+    const estadoOriginal = getNombreEstado(estadoManual);
+    
+    // Determinar si hay cambio de estado
+    const cambioEstado = producto.estado_id !== estadoManual;
+    const infoEstado = cambioEstado 
+      ? `🔄 Estado: ${estadoOriginal} → ${nombreEstado}`
+      : `🔄 Estado: ${nombreEstado} (sin cambios)`;
 
-📦 Producto: ${producto.nombre}
-🏷️ Categoría: ${getNombreCategoria(producto.categoria_id)}
-🔖 Marca: ${getNombreMarca(producto.marca_id)}
-💰 Precio: ${producto.precio_base}
+    // Preparar información de tallas eliminadas
+    const infoTallasEliminadas = tallasEliminadas.length > 0 
+      ? `\n\n🗑️ Tallas a eliminar: ${tallasEliminadas.length} variante(s)`
+      : '';
 
-📏 Tallas y Stock:
-${tallasResumen}
+    const mensaje = `🔍 CONFIRMACIÓN DE CAMBIOS
 
-Esta acción actualizará permanentemente la información del producto.`;
+¿Estás seguro que quieres actualizar este producto?
+
+📦 INFORMACIÓN BÁSICA:
+• Producto: ${producto.nombre}
+• Categoría: ${getNombreCategoria(producto.categoria_id)}
+• Marca: ${getNombreMarca(producto.marca_id)}
+• Precio: ${producto.precio_base}
+
+${infoEstado}
+
+📏 TALLAS Y STOCK (Total: ${stockTotal} unidades):
+${tallasResumen}${infoTallasEliminadas}
+
+⚠️ IMPORTANTE:
+${cambioEstado ? '• El cambio de estado se aplicará inmediatamente' : '• No hay cambios de estado'}
+• Los cambios en stock son permanentes
+• Esta acción no se puede deshacer
+
+¿Continuar con la actualización?`;
 
     if (window.confirm(mensaje)) {
       procesarActualizacion();
     }
   };
 
-  // Enviar formulario - MODIFICADO para nueva lógica
+  // Enviar formulario
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -475,23 +617,23 @@ Esta acción actualizará permanentemente la información del producto.`;
       return;
     }
 
-    // Mostrar confirmación antes de proceder
     prepararConfirmacion();
   };
 
-  // Función separada para procesar la actualización
+  // Función para procesar la actualización
   const procesarActualizacion = async () => {
     setLoading(true);
 
     try {
       console.log('💾 Iniciando actualización del producto...');
 
-      // PASO 1: Actualizar datos básicos
+      // PASO 1: Actualizar datos básicos (incluyendo estado)
       const datosBasicos = {
         nombre: producto.nombre.trim(),
         descripcion: producto.descripcion.trim(),
         imagen_url: producto.imagen_url.trim() || '',
-        categoria_id: parseInt(producto.categoria_id)
+        categoria_id: parseInt(producto.categoria_id),
+        estado_id: parseInt(producto.estado_id)
       };
 
       console.log('📝 Actualizando datos básicos:', datosBasicos);
@@ -515,24 +657,25 @@ Esta acción actualizará permanentemente la información del producto.`;
         );
       }
 
-      // PASO 3: Procesar detalles existentes y nuevos - NUEVA LÓGICA
+      // PASO 3: Procesar detalles existentes y nuevos
       const detallesActualizados = [];
       const detallesNuevos = [];
 
       producto.tallas.forEach((talla) => {
         if (talla.es_existente) {
-          // Talla existente - calcular nuevo stock total
           const stockTotal = calcularStockTotal(talla);
           
           const detalle = {
-            id_detalle_producto: talla.id_detalle_producto,
             marca_id: parseInt(producto.marca_id),
             talla_id: parseInt(talla.talla_id),
             precio: parseFloat(producto.precio_base),
-            stock: stockTotal, // Stock total (actual + agregado)
+            stock: stockTotal,
           };
           
-          detallesActualizados.push(detalle);
+          detallesActualizados.push({
+            id: talla.id_detalle_producto,
+            data: detalle
+          });
           
           console.log(`📊 Talla existente ${talla.nombre_talla}:`, {
             stock_anterior: talla.stock_actual,
@@ -540,7 +683,6 @@ Esta acción actualizará permanentemente la información del producto.`;
             stock_total: stockTotal
           });
         } else {
-          // Talla nueva
           const detalle = {
             producto_id: parseInt(id),
             marca_id: parseInt(producto.marca_id),
@@ -563,15 +705,10 @@ Esta acción actualizará permanentemente la información del producto.`;
       // Actualizar detalles existentes
       if (detallesActualizados.length > 0) {
         await Promise.all(
-          detallesActualizados.map(detalle =>
+          detallesActualizados.map(item =>
             axios.put(
-              `http://localhost:3000/api/admin/producto-detalle/${detalle.id_detalle_producto}`,
-              {
-                marca_id: detalle.marca_id,
-                talla_id: detalle.talla_id,
-                precio: detalle.precio,
-                stock: detalle.stock
-              },
+              `http://localhost:3000/api/admin/producto-detalle/${item.id}`,
+              item.data,
               { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
             )
           )
@@ -590,18 +727,6 @@ Esta acción actualizará permanentemente la información del producto.`;
           )
         );
       }
-
-      // PASO 4: Actualizar estados
-      const estadoActualizacion = {
-        estado_producto_id: 1, // Activo
-        descripcion_cb_estado: `Producto actualizado: ${new Date().toLocaleString()}`,
-      };
-
-      await axios.post(
-        `http://localhost:3000/api/admin/producto/${id}/actualizar-estados`,
-        estadoActualizacion,
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-      );
 
       console.log('✅ Producto actualizado correctamente');
       toast.success('¡Producto actualizado correctamente!', {
@@ -625,7 +750,7 @@ Esta acción actualizará permanentemente la información del producto.`;
     }
   };
 
-  // Obtener tallas disponibles (incluyendo la ya seleccionada)
+  // Obtener tallas disponibles
   const getTallasDisponibles = (currentIndex) => {
     const tallasSeleccionadas = producto.tallas
       .map((talla, index) => index !== currentIndex ? talla.talla_id : null)
@@ -669,6 +794,46 @@ Esta acción actualizará permanentemente la información del producto.`;
     return talla ? talla.nombre_talla : 'Sin talla';
   };
 
+  const getNombreEstado = (estadoId) => {
+    if (!estadoId) return 'Sin estado';
+    const estado = estadosProducto.find(e =>
+      e.id_estado && e.id_estado.toString() === estadoId.toString()
+    );
+    return estado ? estado.nombre_estado : 'Sin estado';
+  };
+
+  // Obtener clase CSS para el estado
+  const getEstadoClass = (estadoId) => {
+    switch (estadoId) {
+      case '1': return 'estado-disponible';
+      case '2': return 'estado-agotado';  
+      case '3': return 'estado-inhabilitado';
+      default: return '';
+    }
+  };
+
+  // FUNCIÓN CLAVE: Determinar si un estado está disponible para selección manual
+  const isEstadoDisponible = (estadoId) => {
+    const stockTotal = calcularStockTotalProducto();
+    
+    // Estado Agotado (2) nunca está disponible para selección manual
+    if (estadoId === '2') {
+      return false;
+    }
+
+    // Estado Disponible (1) solo si hay stock
+    if (estadoId === '1') {
+      return stockTotal > 0;
+    }
+
+    // Estado Inhabilitado (3) siempre disponible
+    if (estadoId === '3') {
+      return true;
+    }
+
+    return false;
+  };
+
   if (loading || !productoCargado) {
     return (
       <div className="agregar-producto-container">
@@ -685,6 +850,35 @@ Esta acción actualizará permanentemente la información del producto.`;
       <div className="header-section">
         <h2>Editar Producto</h2>
         <p className="subtitle">Modifica la información del producto</p>
+        
+        {/* Indicador de estado actual con lógica mejorada */}
+        <div className={`estado-actual ${getEstadoClass(producto.estado_id)}`}>
+          <span className="estado-icono">
+            {producto.estado_id === '1' ? '✅' : producto.estado_id === '2' ? '⚠️' : '❌'}
+          </span>
+          <span className="estado-texto">
+            Estado actual: {getNombreEstado(producto.estado_id)}
+            {producto.estado_id === '2' && ' (Automático)'}
+            {estadoManual === '3' && producto.estado_id === '3' && ' (Manual)'}
+          </span>
+          <span className="stock-total">
+            (Stock total: {calcularStockTotalProducto()} unidades)
+          </span>
+        </div>
+
+        {/* Información sobre lógica de estados */}
+        <div className="estado-info">
+          <small>
+            <strong>Lógica de estados:</strong> 
+            El estado "Agotado" se asigna automáticamente cuando no hay stock. 
+            Solo puedes cambiar manualmente entre "Disponible" e "Inhabilitado".
+            {producto.estado_id !== estadoManual && (
+              <span style={{ color: '#f59e0b', fontWeight: 'bold' }}>
+                {' '}⚠️ Tienes cambios de estado pendientes de confirmar.
+              </span>
+            )}
+          </small>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="form-agregar-producto" noValidate>
@@ -794,37 +988,76 @@ Esta acción actualizará permanentemente la información del producto.`;
             </div>
           </div>
 
-          <div className="form-group">
-            <label>Precio Base *</label>
-            <div className="input-with-icon">
-              <span className="currency-symbol">$</span>
-              <input
-                type="number"
-                name="precio_base"
-                value={producto.precio_base}
-                onChange={handleChange}
-                placeholder="0.00"
-                min="0"
-                step="0.01"
-                className={errores.precio_base ? 'error' : ''}
-              />
+          <div className="form-row">
+            <div className="form-group">
+              <label>Precio Base *</label>
+              <div className="input-with-icon">
+                <span className="currency-symbol">$</span>
+                <input
+                  type="number"
+                  name="precio_base"
+                  value={producto.precio_base}
+                  onChange={handleChange}
+                  placeholder="0.00"
+                  min="0"
+                  step="0.01"
+                  className={errores.precio_base ? 'error' : ''}
+                />
+              </div>
+              {errores.precio_base && <p className="error-text">{errores.precio_base}</p>}
             </div>
-            {errores.precio_base && <p className="error-text">{errores.precio_base}</p>}
+
+            {/* Campo de estado mejorado con restricciones */}
+            <div className="form-group">
+              <label>Estado del Producto *</label>
+              <select
+                name="estado_id"
+                value={producto.estado_id}
+                onChange={handleEstadoChange}
+                className={`estado-select ${getEstadoClass(producto.estado_id)} ${errores.estado_id ? 'error' : ''}`}
+              >
+                <option value="">Selecciona un estado</option>
+                {estadosProducto.map((estado) => {
+                  const isDisabled = !isEstadoDisponible(estado.id_estado.toString());
+                  return (
+                    <option 
+                      key={estado.id_estado} 
+                      value={estado.id_estado}
+                      disabled={isDisabled}
+                      style={isDisabled ? { color: '#ccc' } : {}}
+                    >
+                      {estado.nombre_estado}
+                      {estado.id_estado === 2 && ' (Automático)'}
+                      {estado.id_estado === 1 && calcularStockTotalProducto() === 0 && ' (Sin stock)'}
+                    </option>
+                  );
+                })}
+              </select>
+              {errores.estado_id && <p className="error-text">{errores.estado_id}</p>}
+              <small className="help-text">
+                {producto.estado_id === '1' && '✅ Producto visible y disponible para venta'}
+                {producto.estado_id === '2' && '⚠️ Estado automático: producto visible pero sin stock'}
+                {producto.estado_id === '3' && '❌ Producto oculto al público'}
+              </small>
+            </div>
           </div>
         </div>
 
-        {/* Sección de tallas - NUEVA LÓGICA */}
+        {/* Sección de tallas */}
         <div className="form-section">
           <div className="tallas-header">
             <h3>Tallas y Stock *</h3>
-            <button
-              type="button"
-              onClick={handleAddTalla}
-              className="btn-add-talla"
-              disabled={loading}
-            >
-              <span>+</span> Agregar Talla
-            </button>
+            <div className="tallas-info">
+              <span className="stock-total">Stock Total: {calcularStockTotalProducto()} unidades</span>
+              <button
+                type="button"
+                onClick={handleAddTalla}
+                className="btn-add-talla"
+                disabled={loading}
+              >
+                <span>+</span> Agregar Talla
+              </button>
+            </div>
           </div>
 
           <div className="tallas-grid">
@@ -873,9 +1106,8 @@ Esta acción actualizará permanentemente la información del producto.`;
                     )}
                   </div>
 
-                  {/* NUEVA LÓGICA DE STOCK */}
+                  {/* Lógica de stock */}
                   {talla.es_existente ? (
-                    // Talla existente - mostrar stock actual como solo lectura
                     <>
                       <div className="form-group">
                         <label>Stock Actual</label>
@@ -919,7 +1151,6 @@ Esta acción actualizará permanentemente la información del producto.`;
                       )}
                     </>
                   ) : (
-                    // Talla nueva - campo de stock normal
                     <div className="form-group">
                       <label>Stock Inicial *</label>
                       <input
@@ -981,113 +1212,6 @@ Esta acción actualizará permanentemente la información del producto.`;
         pauseOnHover
         theme="light"
       />
-
-      {/* Modal de Confirmación Profesional */}
-      {mostrarConfirmacion && datosConfirmacion && (
-        <div className="custom-confirm-overlay" onClick={cerrarConfirmacion}>
-          <div className="custom-confirm-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="confirm-header">
-              <div className="confirm-icon">⚠️</div>
-              <h3 className="confirm-title">Confirmar Actualización</h3>
-            </div>
-
-            <div className="confirm-content">
-              <p className="confirm-question">
-                ¿Estás seguro que deseas actualizar este producto?
-              </p>
-
-              <div className="producto-resumen">
-                <div className="resumen-item">
-                  <span className="resumen-label">📦 Producto:</span>
-                  <span className="resumen-valor">{datosConfirmacion.nombre}</span>
-                </div>
-                <div className="resumen-item">
-                  <span className="resumen-label">🏷️ Categoría:</span>
-                  <span className="resumen-valor">{datosConfirmacion.categoria}</span>
-                </div>
-                <div className="resumen-item">
-                  <span className="resumen-label">🔖 Marca:</span>
-                  <span className="resumen-valor">{datosConfirmacion.marca}</span>
-                </div>
-                <div className="resumen-item">
-                  <span className="resumen-label">💰 Precio:</span>
-                  <span className="resumen-valor">${datosConfirmacion.precio}</span>
-                </div>
-              </div>
-
-              <div className="tallas-resumen">
-                <h4 className="tallas-titulo">
-                  📏 Tallas y Stock ({datosConfirmacion.totalTallas} tallas)
-                </h4>
-                
-                {datosConfirmacion.tallasNuevas > 0 && (
-                  <div className="estadistica">
-                    <span className="badge-nueva">{datosConfirmacion.tallasNuevas} nueva(s)</span>
-                  </div>
-                )}
-                
-                {datosConfirmacion.tallasModificadas > 0 && (
-                  <div className="estadistica">
-                    <span className="badge-modificada">{datosConfirmacion.tallasModificadas} modificada(s)</span>
-                  </div>
-                )}
-
-                <div className="tallas-lista">
-                  {datosConfirmacion.tallas.map((talla, index) => (
-                    <div key={index} className={`talla-item ${talla.tipo}`}>
-                      <span className="talla-nombre">{talla.nombre}</span>
-                      {talla.tipo === 'existente' ? (
-                        <span className="talla-stock">
-                          {talla.stockAnterior} → {talla.stockNuevo} unidades
-                          {talla.stockAgregado > 0 && (
-                            <span className="stock-agregado"> (+{talla.stockAgregado})</span>
-                          )}
-                        </span>
-                      ) : (
-                        <span className="talla-stock">
-                          {talla.stockInicial} unidades
-                          <span className="talla-nueva-badge">nueva</span>
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="advertencia">
-                <div className="advertencia-icon">ℹ️</div>
-                <span>Esta acción actualizará permanentemente la información del producto en el sistema.</span>
-              </div>
-            </div>
-
-            <div className="confirm-actions">
-              <button
-                type="button"
-                onClick={cerrarConfirmacion}
-                className="btn-confirm-cancel"
-                disabled={loading}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={confirmarActualizacion}
-                className={`btn-confirm-accept ${loading ? 'loading' : ''}`}
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <span className="spinner-small"></span>
-                    Actualizando...
-                  </>
-                ) : (
-                  'Sí, Actualizar'
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
