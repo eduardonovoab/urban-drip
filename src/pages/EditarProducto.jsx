@@ -28,6 +28,7 @@ const EditarProducto = () => {
   };
 
   const [producto, setProducto] = useState(initialProductState);
+  const [productoOriginal, setProductoOriginal] = useState(null);
   const [estadoManual, setEstadoManual] = useState('1'); // Estado seleccionado manualmente
   const [productoCargado, setProductoCargado] = useState(false);
   const [errores, setErrores] = useState({});
@@ -37,6 +38,9 @@ const EditarProducto = () => {
   const [estadosProducto, setEstadosProducto] = useState([]);
   const [loading, setLoading] = useState(false);
   const [tallasEliminadas, setTallasEliminadas] = useState([]);
+  const [mostrarModalConfirmacion, setMostrarModalConfirmacion] = useState(false);
+  const [tipoConfirmacion, setTipoConfirmacion] = useState('');
+  const [mostrarModalExito, setMostrarModalExito] = useState(false);
 
   // Función para procesar datos del producto
   const procesarProductoConDetalles = (productosData) => {
@@ -222,6 +226,8 @@ const EditarProducto = () => {
         // Configurar estado manual inicial
         setEstadoManual(productData.estado_id || '1');
 
+        let productoConfigurado;
+
         if (productData.detalles && productData.detalles.length > 0) {
           const primerDetalle = productData.detalles[0];
 
@@ -233,7 +239,7 @@ const EditarProducto = () => {
             total_detalles: productData.detalles.length
           });
 
-          setProducto({
+          productoConfigurado = {
             nombre: productData.nombre || '',
             descripcion: productData.descripcion || '',
             imagen_url: productData.imagen_url || '',
@@ -250,10 +256,10 @@ const EditarProducto = () => {
               nombre_talla: detalle.nombre_talla || 'Sin talla',
               nombre_marca: detalle.nombre_marca || 'Sin marca'
             }))
-          });
+          };
         } else {
           console.log('⚠️ Producto sin detalles, configurando valores por defecto');
-          setProducto({
+          productoConfigurado = {
             nombre: productData.nombre || '',
             descripcion: productData.descripcion || '',
             imagen_url: productData.imagen_url || '',
@@ -269,8 +275,11 @@ const EditarProducto = () => {
               es_existente: false,
               nombre_talla: 'Sin talla' 
             }]
-          });
+          };
         }
+
+        setProducto(productoConfigurado);
+        setProductoOriginal(JSON.parse(JSON.stringify(productoConfigurado))); // Guardar copia profunda
 
         console.log('✅ Producto configurado correctamente');
         setProductoCargado(true);
@@ -315,6 +324,49 @@ const EditarProducto = () => {
     });
   }, []);
 
+  // Función para verificar si hubo cambios
+  const huboCambios = () => {
+    if (!productoOriginal) return false;
+    
+    // Comparar datos básicos
+    if (
+      producto.nombre !== productoOriginal.nombre ||
+      producto.descripcion !== productoOriginal.descripcion ||
+      producto.imagen_url !== productoOriginal.imagen_url ||
+      producto.categoria_id !== productoOriginal.categoria_id ||
+      producto.marca_id !== productoOriginal.marca_id ||
+      producto.precio_base !== productoOriginal.precio_base ||
+      producto.estado_id !== productoOriginal.estado_id
+    ) {
+      return true;
+    }
+
+    // Comparar tallas
+    if (producto.tallas.length !== productoOriginal.tallas.length) {
+      return true;
+    }
+
+    // Comparar cada talla
+    for (let i = 0; i < producto.tallas.length; i++) {
+      const tallaActual = producto.tallas[i];
+      const tallaOriginal = productoOriginal.tallas[i];
+      
+      if (
+        tallaActual.talla_id !== tallaOriginal.talla_id ||
+        tallaActual.stock_agregar !== tallaOriginal.stock_agregar
+      ) {
+        return true;
+      }
+    }
+
+    // Verificar si hay tallas eliminadas
+    if (tallasEliminadas.length > 0) {
+      return true;
+    }
+
+    return false;
+  };
+
   // Manejar cambios en campos principales
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -325,12 +377,26 @@ const EditarProducto = () => {
     }
   };
 
+  // Manejar clic en cancelar
+  const handleCancelar = () => {
+    if (huboCambios()) {
+      setTipoConfirmacion('cancelar');
+      setMostrarModalConfirmacion(true);
+    } else {
+      navigate('/admin/ListarProductos');
+    }
+  };
+
+  // Manejar confirmación de cancelar
+  const confirmarCancelar = () => {
+    setMostrarModalConfirmacion(false);
+    toast.info('Los cambios han sido descartados');
+    navigate('/admin/ListarProductos');
+  };
+
   // FUNCIÓN CLAVE: Manejar cambio de estado manual (solo Disponible ↔ Inhabilitado)
   const handleEstadoChange = (e) => {
     const nuevoEstado = e.target.value;
-    
-    // NO APLICAR EL CAMBIO INMEDIATAMENTE - solo guardarlo
-    // El cambio se aplicará cuando el usuario confirme con "Actualizar Producto"
     
     console.log('🔄 Preparando cambio de estado manual:', {
       estadoActual: producto.estado_id,
@@ -544,63 +610,6 @@ const EditarProducto = () => {
     return valido;
   };
 
-  // Mostrar alerta de confirmación MEJORADA
-  const prepararConfirmacion = () => {
-    const stockTotal = calcularStockTotalProducto();
-    
-    // Preparar información del resumen para mostrar en la confirmación
-    const tallasResumen = producto.tallas.map(talla => {
-      const nombreTalla = getNombreTalla(talla.talla_id);
-      if (talla.es_existente) {
-        const stockTotal = calcularStockTotal(talla);
-        const stockAgregar = parseInt(talla.stock_agregar) || 0;
-        return `• ${nombreTalla}: ${talla.stock_actual} → ${stockTotal} unidades${stockAgregar > 0 ? ` (+${stockAgregar})` : ''}`;
-      } else {
-        return `• ${nombreTalla}: ${talla.stock_agregar || 0} unidades (nueva)`;
-      }
-    }).join('\n');
-
-    const nombreEstado = getNombreEstado(producto.estado_id);
-    const estadoOriginal = getNombreEstado(estadoManual);
-    
-    // Determinar si hay cambio de estado
-    const cambioEstado = producto.estado_id !== estadoManual;
-    const infoEstado = cambioEstado 
-      ? `🔄 Estado: ${estadoOriginal} → ${nombreEstado}`
-      : `🔄 Estado: ${nombreEstado} (sin cambios)`;
-
-    // Preparar información de tallas eliminadas
-    const infoTallasEliminadas = tallasEliminadas.length > 0 
-      ? `\n\n🗑️ Tallas a eliminar: ${tallasEliminadas.length} variante(s)`
-      : '';
-
-    const mensaje = `🔍 CONFIRMACIÓN DE CAMBIOS
-
-¿Estás seguro que quieres actualizar este producto?
-
-📦 INFORMACIÓN BÁSICA:
-• Producto: ${producto.nombre}
-• Categoría: ${getNombreCategoria(producto.categoria_id)}
-• Marca: ${getNombreMarca(producto.marca_id)}
-• Precio: ${producto.precio_base}
-
-${infoEstado}
-
-📏 TALLAS Y STOCK (Total: ${stockTotal} unidades):
-${tallasResumen}${infoTallasEliminadas}
-
-⚠️ IMPORTANTE:
-${cambioEstado ? '• El cambio de estado se aplicará inmediatamente' : '• No hay cambios de estado'}
-• Los cambios en stock son permanentes
-• Esta acción no se puede deshacer
-
-¿Continuar con la actualización?`;
-
-    if (window.confirm(mensaje)) {
-      procesarActualizacion();
-    }
-  };
-
   // Enviar formulario
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -617,7 +626,15 @@ ${cambioEstado ? '• El cambio de estado se aplicará inmediatamente' : '• No
       return;
     }
 
-    prepararConfirmacion();
+    // Mostrar modal de confirmación
+    setTipoConfirmacion('guardar');
+    setMostrarModalConfirmacion(true);
+  };
+
+  // Confirmar guardado de cambios
+  const confirmarGuardado = async () => {
+    setMostrarModalConfirmacion(false);
+    await procesarActualizacion();
   };
 
   // Función para procesar la actualización
@@ -729,14 +746,15 @@ ${cambioEstado ? '• El cambio de estado se aplicará inmediatamente' : '• No
       }
 
       console.log('✅ Producto actualizado correctamente');
-      toast.success('¡Producto actualizado correctamente!', {
-        autoClose: 2000,
-        icon: '✅'
-      });
-
+      
+      // Mostrar modal de éxito
+      setMostrarModalExito(true);
+      
+      // Cerrar el modal de éxito después de 3 segundos y redirigir
       setTimeout(() => {
+        setMostrarModalExito(false);
         navigate('/admin/ListarProductos');
-      }, 2500);
+      }, 3000);
 
     } catch (error) {
       console.error('❌ Error al actualizar producto:', error);
@@ -834,6 +852,91 @@ ${cambioEstado ? '• El cambio de estado se aplicará inmediatamente' : '• No
     return false;
   };
 
+  // Componente Modal de Confirmación
+  const ModalConfirmacion = () => {
+    if (!mostrarModalConfirmacion) return null;
+
+    const esGuardar = tipoConfirmacion === 'guardar';
+    const titulo = esGuardar ? '¿Actualizar producto?' : '¿Cancelar edición?';
+    const mensaje = esGuardar 
+      ? '¿Estás seguro de que deseas guardar los cambios realizados en este producto?'
+      : '¿Estás seguro de que deseas cancelar? Se perderán todos los cambios no guardados.';
+    const textoConfirmar = esGuardar ? 'Sí, actualizar' : 'Sí, cancelar';
+    const textoRechazar = esGuardar ? 'No, continuar editando' : 'No, seguir editando';
+    const handleConfirmar = esGuardar ? confirmarGuardado : confirmarCancelar;
+
+    return (
+      <>
+        <div className="modal-backdrop" onClick={() => setMostrarModalConfirmacion(false)}></div>
+        <div className="modal-confirmacion">
+          <div className="modal-header">
+            <h3>{titulo}</h3>
+          </div>
+          <div className="modal-body">
+            <p>{mensaje}</p>
+            {esGuardar && (
+              <div className="resumen-cambios">
+                <h4>Resumen de cambios:</h4>
+                <ul>
+                  <li>Producto: {producto.nombre}</li>
+                  <li>Estado: {getNombreEstado(producto.estado_id)}</li>
+                  <li>Stock total: {calcularStockTotalProducto()} unidades</li>
+                  {tallasEliminadas.length > 0 && (
+                    <li>Tallas a eliminar: {tallasEliminadas.length}</li>
+                  )}
+                </ul>
+              </div>
+            )}
+          </div>
+          <div className="modal-footer">
+            <button 
+              className="btn-modal-confirmar"
+              onClick={handleConfirmar}
+              disabled={loading}
+            >
+              {loading ? 'Procesando...' : textoConfirmar}
+            </button>
+            <button 
+              className="btn-modal-cancelar"
+              onClick={() => setMostrarModalConfirmacion(false)}
+              disabled={loading}
+            >
+              {textoRechazar}
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  };
+
+  // Componente Modal de Éxito
+  const ModalExito = () => {
+    if (!mostrarModalExito) return null;
+
+    return (
+      <>
+        <div className="modal-backdrop-exito"></div>
+        <div className="modal-exito">
+          <div className="modal-exito-content">
+            <div className="modal-exito-icon">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                <path d="M7 12.5L10.5 16L17 9.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+            <h3 className="modal-exito-titulo">¡Producto actualizado con éxito!</h3>
+            <p className="modal-exito-mensaje">
+              Los cambios han sido guardados correctamente.
+            </p>
+            <div className="modal-exito-loading">
+              <div className="loading-bar"></div>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  };
+
   if (loading || !productoCargado) {
     return (
       <div className="agregar-producto-container">
@@ -847,6 +950,12 @@ ${cambioEstado ? '• El cambio de estado se aplicará inmediatamente' : '• No
 
   return (
     <div className="agregar-producto-container">
+      {/* Modal de Confirmación */}
+      <ModalConfirmacion />
+      
+      {/* Modal de Éxito */}
+      <ModalExito />
+
       <div className="header-section">
         <h2>Editar Producto</h2>
         <p className="subtitle">Modifica la información del producto</p>
@@ -1177,7 +1286,7 @@ ${cambioEstado ? '• El cambio de estado se aplicará inmediatamente' : '• No
         <div className="form-actions">
           <button
             type="button"
-            onClick={() => navigate('/admin/ListarProductos')}
+            onClick={handleCancelar}
             className="btn-secondary"
             disabled={loading}
           >

@@ -14,14 +14,15 @@ import {
   // Pedidos y Compras
   finalizarCompra,
   getHistorialPedidos,
+  getEstadosPedido,
   
   // Usuario (con comuna)
   getDatosUsuario,
   modificarDatosUsuario,
-
+getPedidosReservados,
    getDetallePedido,
   getSeguimientoPedido
-} from '../controllers/ClientController.js';
+} from '../controllers/clientController.js';
 
 import { authenticateToken, verifyAdmin, isClient } from '../middleware/authMiddleware.js';
 
@@ -87,6 +88,8 @@ router.delete('/carrito/limpiar', authenticateToken, isClient, limpiarCarrito);
 // RUTAS DE PEDIDOS Y COMPRAS (solo clientes)
 // ============================================
 
+router.get('/estados/pedido', authenticateToken, getEstadosPedido);
+
 // POST /api/client/carrito/finalizar - Finalizar compra (crear pedido pendiente)
 router.post('/carrito/finalizar', authenticateToken, isClient, finalizarCompra);
 
@@ -101,6 +104,7 @@ router.get('/pedidos/:pedido_id/seguimiento', authenticateToken, isClient, getSe
 
 // GET /api/client/pedidos/:pedido_id - Obtener detalle de un pedido específico
 // router.get('/pedidos/:pedido_id', authenticateToken, isClient, getDetallePedido);
+router.get('/pedidos/reservados', authenticateToken, getPedidosReservados);
 
 // ============================================
 // RUTAS DE USUARIO CON COMUNA (tanto admin como cliente)

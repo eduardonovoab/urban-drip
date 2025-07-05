@@ -1,4 +1,4 @@
-// components/CarritoPage.jsx - INTEGRADO CON SISTEMA DE ESTADOS
+// components/CarritoPage.jsx - VERSIÓN COMBINADA CON SISTEMA DE ESTADOS Y PAGO EN EFECTIVO
 import React, { useState, useEffect } from 'react';
 import { useCarrito } from '../context/CarritoContext';
 import { useNavigate } from 'react-router-dom';
@@ -27,6 +27,8 @@ const CarritoPage = () => {
 
   const navigate = useNavigate();
   const [procesandoCompra, setProcesandoCompra] = useState(false);
+  const [mostrarModalPago, setMostrarModalPago] = useState(false);
+  const [metodoPagoSeleccionado, setMetodoPagoSeleccionado] = useState('');
 
   const isLoading = loading || carritoLoading;
   const isInitialized = initialized;
@@ -141,8 +143,8 @@ const CarritoPage = () => {
     }, 1000);
   };
 
-  // 🚀 FUNCIÓN ACTUALIZADA - INTEGRADA CON SISTEMA DE ESTADOS
-  const handleProcederAlPago = async () => {
+  // 🎯 FUNCIÓN COMBINADA: Mostrar modal de selección de pago
+  const handleProcederAlPago = () => {
     // Validaciones iniciales
     if (!carritoData.items || carritoData.items.length === 0) {
       toast.error('Tu carrito está vacío');
@@ -154,10 +156,118 @@ const CarritoPage = () => {
       return;
     }
 
-    setProcesandoCompra(true);
+    // Mostrar modal de opciones de pago
+    setMostrarModalPago(true);
+    setMetodoPagoSeleccionado('');
+  };
 
+  // 🎯 FUNCIÓN COMBINADA: Procesar pago unificado
+  const procesarPago = async () => {
+    if (!metodoPagoSeleccionado) {
+      toast.error('Por favor selecciona un método de pago');
+      return;
+    }
+
+    setProcesandoCompra(true);
+    
     try {
-      console.log('=== INICIANDO PROCESO DE COMPRA ===');
+      console.log('=== PROCESANDO PAGO ===');
+      console.log('Método de pago:', metodoPagoSeleccionado);
+      
+      if (metodoPagoSeleccionado === 'Efectivo') {
+        await procesarPagoEfectivo();
+      } else if (metodoPagoSeleccionado === 'Webpay') {
+        await procesarPagoWebpay();
+      }
+      
+    } catch (error) {
+      console.error('Error al procesar pago:', error);
+      toast.error(error.message || 'Error al procesar el pago');
+    } finally {
+      setProcesandoCompra(false);
+    }
+  };
+
+  // 🎯 FUNCIÓN: Procesar pago en efectivo
+  const procesarPagoEfectivo = async () => {
+    try {
+      console.log('=== INICIANDO PROCESO DE RESERVA (PAGO EN EFECTIVO) ===');
+      console.log('Carrito data:', carritoData);
+
+      // PASO 1: Finalizar carrito con método "Efectivo" (creará pedido en estado "Reservado")
+      console.log('🛒 PASO 1: Creando reserva del pedido...');
+      
+      const resultFinalizar = await finalizarCompra('Efectivo');
+      
+      if (!resultFinalizar.success) {
+        throw new Error(resultFinalizar.message || 'Error al crear la reserva');
+      }
+      
+      const pedidoId = resultFinalizar.pedido_id;
+      const codigoReserva = resultFinalizar.codigo_reserva || `RES-${pedidoId}`;
+      console.log('✅ Pedido reservado. ID:', pedidoId);
+
+      // Guardar información de la reserva
+      const reservaInfo = {
+        pedido_id: pedidoId,
+        codigo_reserva: codigoReserva,
+        metodo_pago: 'Efectivo',
+        estado: 'Reservado',
+        total: carritoData.total,
+        items: carritoData.items.map(item => ({
+          nombre: item.nombre_producto || item.nombre,
+          cantidad: item.cantidad,
+          precio: item.precio,
+          subtotal: item.subtotal || (item.precio * item.cantidad)
+        })),
+        fecha_reserva: new Date().toISOString(),
+        fecha_expiracion: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString() // 48 horas
+      };
+
+      localStorage.setItem('reservaInfo', JSON.stringify(reservaInfo));
+
+      // Mostrar mensaje de éxito
+      toast.success('¡Pedido reservado exitosamente!', {
+        autoClose: 3000
+      });
+
+      // Cerrar modal
+      setMostrarModalPago(false);
+
+      // Redirigir a página de confirmación de reserva
+      setTimeout(() => {
+        navigate('/reserva-confirmada', { 
+          state: { 
+            pedidoId,
+            codigoReserva,
+            total: carritoData.total,
+            metodo_pago: 'Efectivo'
+          } 
+        });
+      }, 1000);
+
+    } catch (error) {
+      console.error('=== ERROR EN PROCESO DE RESERVA ===');
+      console.error('Error:', error);
+      
+      toast.error(error.message || 'Error al procesar la reserva', {
+        autoClose: 5000
+      });
+      
+      localStorage.removeItem('reservaInfo');
+      
+      if (fetchCarrito) {
+        fetchCarrito(false);
+      }
+      
+      throw error;
+    }
+  };
+
+  // 🔄 FUNCIÓN: Procesar pago con Webpay
+  const procesarPagoWebpay = async () => {
+    try {
+      console.log('=== INICIANDO PROCESO DE COMPRA CON WEBPAY ===');
       console.log('Carrito data:', carritoData);
 
       // PASO 1: Finalizar carrito (crear pedido en estado "Pendiente")
@@ -188,7 +298,7 @@ const CarritoPage = () => {
 
       // Guardar información para después del pago
       const purchaseInfo = {
-        pedido_id: pedidoId, // 🔥 NUEVO: Guardar ID del pedido
+        pedido_id: pedidoId,
         buyOrder,
         sessionId,
         total: carritoData.total,
@@ -209,7 +319,7 @@ const CarritoPage = () => {
         buyOrder: buyOrder,
         sessionId: sessionId,
         returnUrl: returnUrl,
-        pedido_id: pedidoId // 🔥 NUEVO: Incluir pedido_id
+        pedido_id: pedidoId
       };
 
       console.log('=== ENVIANDO A WEBPAY ===');
@@ -221,7 +331,7 @@ const CarritoPage = () => {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}` // 🔥 NUEVO: Incluir token
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify(transactionData)
       });
@@ -288,6 +398,9 @@ const CarritoPage = () => {
       // Guardar token de Transbank
       localStorage.setItem('transbankToken', data.token);
 
+      // Cerrar modal
+      setMostrarModalPago(false);
+
       // PASO 4: Redirigir a Transbank
       toast.success('Pedido creado correctamente. Redirigiendo a Transbank...', {
         autoClose: 2000
@@ -336,8 +449,7 @@ const CarritoPage = () => {
         fetchCarrito(false);
       }
       
-    } finally {
-      setProcesandoCompra(false);
+      throw error;
     }
   };
 
@@ -488,7 +600,7 @@ const CarritoPage = () => {
                       Vaciar Carrito
                     </button>
                     
-                    {/* 🔥 BOTÓN ACTUALIZADO - INTEGRADO CON NUEVOS ESTADOS */}
+                    {/* 🔥 BOTÓN PRINCIPAL - MUESTRA MODAL DE OPCIONES */}
                     <button 
                       className="btn-comprar"
                       onClick={handleProcederAlPago}
@@ -501,10 +613,10 @@ const CarritoPage = () => {
                       {procesandoCompra ? (
                         <>
                           <div className="loading-spinner-btn"></div>
-                          Procesando pedido...
+                          Procesando...
                         </>
                       ) : (
-                        '🛒 Crear Pedido y Pagar'
+                        '💳 Proceder al Pago'
                       )}
                     </button>
                   </div>
@@ -517,7 +629,7 @@ const CarritoPage = () => {
                     ← Continuar Comprando
                   </button>
 
-                  {/* 🔥 NUEVA INFORMACIÓN DE PROCESO */}
+                  {/* 🔥 INFORMACIÓN DE PROCESO MEJORADA */}
                   <div className="purchase-process-info" style={{
                     marginTop: '20px',
                     padding: '15px',
@@ -527,42 +639,36 @@ const CarritoPage = () => {
                     borderLeft: '4px solid #007bff'
                   }}>
                     <h4 style={{ margin: '0 0 10px 0', color: '#007bff' }}>📋 Proceso de Compra:</h4>
-                    <ol style={{ margin: 0, paddingLeft: '20px' }}>
-                      <li>Se crea tu pedido en estado <strong>Pendiente</strong></li>
-                      <li>Te redirigimos a <strong>Transbank</strong> para el pago</li>
-                      <li>Después del pago exitoso, tu pedido pasa a <strong>Pagado</strong></li>
-                      <li>Preparamos tu pedido y lo marcamos como <strong>Enviado</strong></li>
-                      <li>Finalmente llega a ti como <strong>Entregado</strong></li>
-                    </ol>
-                  </div>
-
-                  {/* Información de debug en desarrollo */}
-                  {process.env.NODE_ENV === 'development' && (
-                    <div className="debug-info" style={{
-                      marginTop: '20px',
-                      padding: '10px',
-                      backgroundColor: '#f5f5f5',
-                      borderRadius: '5px',
-                      fontSize: '12px'
-                    }}>
-                      <h4>Debug Info:</h4>
-                      <p>Items: {carritoData.items?.length || 0}</p>
-                      <p>Total: ${carritoData.total}</p>
-                      <p><strong>Flujo:</strong> finalizar → webpay → confirmar</p>
-                      <p><strong>Estados:</strong> Carrito → Pendiente → Pagado → Enviado → Entregado</p>
+                    <div style={{ marginBottom: '15px' }}>
+                      <h5 style={{ margin: '8px 0', fontWeight: 'bold' }}>💰 Pago en Efectivo:</h5>
+                      <ol style={{ margin: 0, paddingLeft: '20px' }}>
+                        <li>Se crea tu pedido en estado <strong>Reservado</strong></li>
+                        <li>Tienes <strong>48 horas</strong> para retirar y pagar en tienda</li>
+                        <li>Al pagar, tu pedido pasa a <strong>Pagado</strong></li>
+                        <li>Retiras tu producto inmediatamente</li>
+                      </ol>
                     </div>
-                  )}
+                    <div>
+                      <h5 style={{ margin: '8px 0', fontWeight: 'bold' }}>💳 Pago con Webpay:</h5>
+                      <ol style={{ margin: 0, paddingLeft: '20px' }}>
+                        <li>Se crea tu pedido en estado <strong>Pendiente</strong></li>
+                        <li>Te redirigimos a <strong>Transbank</strong> para el pago</li>
+                        <li>Después del pago exitoso, tu pedido pasa a <strong>Pagado</strong></li>
+                        <li>Preparamos tu pedido y lo marcamos como <strong>Preparado</strong></li>
+                        <li>Retiras en tienda cuando esté listo</li>
+                      </ol>
+                    </div>
+                  </div>
 
                   {/* Información de seguridad */}
                   <div className="payment-security-info">
                     <div className="security-badges">
                       <span className="security-badge">🔒 Pago Seguro</span>
                       <span className="security-badge">🏦 Transbank</span>
-                      <span className="security-badge">✅ SSL</span>
+                      <span className="security-badge">💵 Efectivo</span>
                     </div>
                     <p className="security-text">
-                      Tu pago será procesado de forma segura a través de Transbank, 
-                      el sistema de pagos más confiable de Chile.
+                      Puedes pagar de forma segura con Transbank o reservar para pagar en efectivo al retirar.
                     </p>
                   </div>
                 </div>
@@ -571,6 +677,113 @@ const CarritoPage = () => {
           )}
         </div>
       </div>
+
+      {/* 🎯 MODAL DE SELECCIÓN DE MÉTODO DE PAGO COMBINADO */}
+      {mostrarModalPago && (
+        <div className="modal-overlay" onClick={() => setMostrarModalPago(false)}>
+          <div className="modal-pago" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Selecciona tu método de pago</h2>
+              <button 
+                className="modal-close"
+                onClick={() => {
+                  setMostrarModalPago(false);
+                  setMetodoPagoSeleccionado('');
+                }}
+                disabled={procesandoCompra}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="modal-body">
+              <div className="metodos-pago">
+                {/* Opción: Pago en Efectivo */}
+                <div 
+                  className={`metodo-pago-card ${metodoPagoSeleccionado === 'Efectivo' ? 'selected' : ''}`}
+                  onClick={() => setMetodoPagoSeleccionado('Efectivo')}
+                >
+                  <div className="metodo-icon">💵</div>
+                  <h3>Pago en Efectivo</h3>
+                  <p>Reserva tu pedido y paga al retirar en tienda</p>
+                  <ul className="metodo-features">
+                    <li>✅ Sin necesidad de tarjeta</li>
+                    <li>✅ Reserva por 48 horas</li>
+                    <li>✅ Paga cuando retires</li>
+                    <li>✅ Sin cargos adicionales</li>
+                  </ul>
+                  <div className="metodo-badge">Retiro en Tienda</div>
+                </div>
+
+                {/* Opción: Pago con Webpay */}
+                <div 
+                  className={`metodo-pago-card ${metodoPagoSeleccionado === 'Webpay' ? 'selected' : ''}`}
+                  onClick={() => setMetodoPagoSeleccionado('Webpay')}
+                >
+                  <div className="metodo-icon">💳</div>
+                  <h3>Pago con Webpay</h3>
+                  <p>Paga de forma segura con tarjetas de crédito o débito</p>
+                  <ul className="metodo-features">
+                    <li>✅ Pago inmediato y seguro</li>
+                    <li>✅ Acepta todas las tarjetas</li>
+                    <li>✅ Transacción segura</li>
+                    <li>✅ Confirmación instantánea</li>
+                  </ul>
+                  <div className="metodo-badge">Pago Online</div>
+                </div>
+              </div>
+
+              {/* Información adicional según método seleccionado */}
+              {metodoPagoSeleccionado === 'Efectivo' && (
+                <div className="metodo-info-adicional">
+                  <h4>📍 Información de retiro en tienda:</h4>
+                  <p><strong>Dirección:</strong> Av. Principal 123, Santiago</p>
+                  <p><strong>Horario:</strong> Lunes a Sábado 10:00 - 20:00</p>
+                  <p><strong>Importante:</strong> Debes presentar tu código de reserva al momento del retiro.</p>
+                </div>
+              )}
+
+              {metodoPagoSeleccionado === 'Webpay' && (
+                <div className="metodo-info-adicional">
+                  <h4>🔒 Pago seguro con Transbank:</h4>
+                  <p>Serás redirigido al portal seguro de Transbank para completar tu pago.</p>
+                  <p>Aceptamos todas las tarjetas de crédito y débito nacionales.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              <button 
+                className="btn-cancelar"
+                onClick={() => {
+                  setMostrarModalPago(false);
+                  setMetodoPagoSeleccionado('');
+                }}
+                disabled={procesandoCompra}
+              >
+                Cancelar
+              </button>
+              <button 
+                className="btn-continuar"
+                onClick={procesarPago}
+                disabled={!metodoPagoSeleccionado || procesandoCompra}
+              >
+                {procesandoCompra ? (
+                  <>
+                    <div className="loading-spinner-btn"></div>
+                    Procesando...
+                  </>
+                ) : (
+                  <>
+                    Continuar con {metodoPagoSeleccionado === 'Efectivo' ? 'Efectivo' : 'Webpay'}
+                    →
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

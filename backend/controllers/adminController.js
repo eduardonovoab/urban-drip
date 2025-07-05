@@ -620,7 +620,7 @@ export const getProductoDetallePorId = async (req, res) => {
 // Obtener productos por marca
 export const getProductosPorMarca = async (req, res) => {
   const { id } = req.params; // Obtener ID de la marca desde los parámetros de la URL
-  
+
   try {
     // Consulta para obtener productos de una marca específica
     const [productos] = await pool.query(`
@@ -639,18 +639,18 @@ export const getProductosPorMarca = async (req, res) => {
       INNER JOIN marca m ON pd.marca_id_marca = m.id_marca
       WHERE m.id_marca = ?
       ORDER BY p.nombre_producto ASC`, [id]);
-    
+
     if (productos.length === 0) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: 'No se encontraron productos para esta marca',
         productos: [],
         marcaNombre: ''
       });
     }
-    
+
     // Obtener el nombre de la marca del primer producto
     const marcaNombre = productos[0].nombre_marca;
-    
+
     res.json({
       productos: productos,
       marcaNombre: marcaNombre
@@ -882,7 +882,7 @@ export const getDetallePedidoAdmin = async (req, res) => {
 
     // Obtener información de venta si existe
     const [venta] = await pool.execute(`
-      SELECT fecha_venta, metodo_pago
+      SELECT fecha_venta, metodo_pago_id_metodo
       FROM venta
       WHERE pedido_id_pedido = ?
     `, [pedido_id]);
@@ -908,206 +908,9 @@ export const getDetallePedidoAdmin = async (req, res) => {
     });
   }
 };
-
-// Cambiar estado de un pedido (solo admin)
-export const cambiarEstadoPedido = async (req, res) => {
-  const connection = await pool.getConnection();
-  
-  try {
-    await connection.beginTransaction();
-    
-    const { pedido_id } = req.params;
-    const { nuevo_estado, descripcion } = req.body;
-
-    console.log('=== CAMBIANDO ESTADO DE PEDIDO (ADMIN) ===');
-    console.log('📦 Pedido ID:', pedido_id);
-    console.log('🔄 Nuevo estado:', nuevo_estado);
-    console.log('📝 Descripción:', descripcion);
-
-    // Validar que el estado sea válido para admin
-    const estadosPermitidos = ['Enviado', 'Entregado'];
-    if (!estadosPermitidos.includes(nuevo_estado)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Estado no válido. Solo se permite cambiar a: Enviado, Entregado'
-      });
-    }
-
-    // Verificar que el pedido existe
-    const [pedidoExiste] = await connection.execute(`
-      SELECT id_pedido FROM pedido WHERE id_pedido = ?
-    `, [pedido_id]);
-
-    if (pedidoExiste.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Pedido no encontrado'
-      });
-    }
-
-    // Obtener el estado actual del pedido
-    const [estadoActual] = await connection.execute(`
-      SELECT ep.nombre_estado, ep.id_estado
-      FROM detalle_estado de
-      JOIN estado_pedido ep ON de.estado_pedido_id_estado = ep.id_estado
-      WHERE de.pedido_id_pedido = ?
-      ORDER BY de.fecha_cb_estado DESC, de.id_detalle_estado DESC
-      LIMIT 1
-    `, [pedido_id]);
-
-    if (estadoActual.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'No se pudo determinar el estado actual del pedido'
-      });
-    }
-
-    const estadoActualNombre = estadoActual[0].nombre_estado;
-
-    // Validar transiciones de estado permitidas
-    const transicionesValidas = {
-      'Pendiente': ['Enviado'],
-      'Pagado': ['Enviado'],
-      'Enviado': ['Entregado'],
-      'Entregado': [] // No se puede cambiar desde entregado
-    };
-
-    if (!transicionesValidas[estadoActualNombre] || 
-        !transicionesValidas[estadoActualNombre].includes(nuevo_estado)) {
-      return res.status(400).json({
-        success: false,
-        message: `No se puede cambiar de "${estadoActualNombre}" a "${nuevo_estado}"`
-      });
-    }
-
-    // Obtener ID del nuevo estado
-    const [nuevoEstadoInfo] = await connection.execute(`
-      SELECT id_estado FROM estado_pedido WHERE nombre_estado = ?
-    `, [nuevo_estado]);
-
-    if (nuevoEstadoInfo.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Estado objetivo no encontrado en el sistema'
-      });
-    }
-
-    const nuevoEstadoId = nuevoEstadoInfo[0].id_estado;
-
-    // Crear el nuevo registro de cambio de estado
-    await connection.execute(`
-      INSERT INTO detalle_estado (fecha_cb_estado, descripcion_cb_estado, pedido_id_pedido, estado_pedido_id_estado)
-      VALUES (NOW(), ?, ?, ?)
-    `, [descripcion || `Cambio de estado a ${nuevo_estado}`, pedido_id, nuevoEstadoId]);
-
-    await connection.commit();
-
-    console.log(`✅ Estado cambiado exitosamente de "${estadoActualNombre}" a "${nuevo_estado}"`);
-
-    res.json({
-      success: true,
-      message: `Estado del pedido cambiado exitosamente a "${nuevo_estado}"`,
-      estado_anterior: estadoActualNombre,
-      estado_nuevo: nuevo_estado
-    });
-
-  } catch (error) {
-    await connection.rollback();
-    console.error('❌ Error al cambiar estado del pedido:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error interno del servidor',
-      error: error.message
-    });
-  } finally {
-    connection.release();
-  }
-};
-
-// Obtener estadísticas de pedidos para el admin
-export const getEstadisticasPedidos = async (req, res) => {
-  try {
-    console.log('=== OBTENIENDO ESTADÍSTICAS DE PEDIDOS ===');
-
-    // Estadísticas por estado
-    const [estadisticasPorEstado] = await pool.execute(`
-      SELECT 
-        ep.nombre_estado,
-        COUNT(DISTINCT p.id_pedido) as cantidad_pedidos,
-        COALESCE(SUM(p.total), 0) as total_ventas
-      FROM pedido p
-      JOIN detalle_estado de ON p.id_pedido = de.pedido_id_pedido
-      JOIN estado_pedido ep ON de.estado_pedido_id_estado = ep.id_estado
-      WHERE de.id_detalle_estado = (
-        SELECT MAX(de2.id_detalle_estado)
-        FROM detalle_estado de2
-        WHERE de2.pedido_id_pedido = p.id_pedido
-      )
-      AND ep.nombre_estado != 'Carrito'
-      GROUP BY ep.id_estado, ep.nombre_estado
-      ORDER BY cantidad_pedidos DESC
-    `);
-
-    // Pedidos por mes (últimos 6 meses)
-    const [pedidosPorMes] = await pool.execute(`
-      SELECT 
-        DATE_FORMAT(p.fecha_pedido, '%Y-%m') as mes,
-        COUNT(p.id_pedido) as cantidad_pedidos,
-        SUM(p.total) as total_ventas
-      FROM pedido p
-      JOIN detalle_estado de ON p.id_pedido = de.pedido_id_pedido
-      JOIN estado_pedido ep ON de.estado_pedido_id_estado = ep.id_estado
-      WHERE de.id_detalle_estado = (
-        SELECT MAX(de2.id_detalle_estado)
-        FROM detalle_estado de2
-        WHERE de2.pedido_id_pedido = p.id_pedido
-      )
-      AND ep.nombre_estado != 'Carrito'
-      AND p.fecha_pedido >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
-      GROUP BY DATE_FORMAT(p.fecha_pedido, '%Y-%m')
-      ORDER BY mes DESC
-    `);
-
-    // Totales generales
-    const [totalesGenerales] = await pool.execute(`
-      SELECT 
-        COUNT(DISTINCT p.id_pedido) as total_pedidos,
-        SUM(p.total) as total_ventas,
-        AVG(p.total) as promedio_pedido
-      FROM pedido p
-      JOIN detalle_estado de ON p.id_pedido = de.pedido_id_pedido
-      JOIN estado_pedido ep ON de.estado_pedido_id_estado = ep.id_estado
-      WHERE de.id_detalle_estado = (
-        SELECT MAX(de2.id_detalle_estado)
-        FROM detalle_estado de2
-        WHERE de2.pedido_id_pedido = p.id_pedido
-      )
-      AND ep.nombre_estado != 'Carrito'
-    `);
-
-    console.log('✅ Estadísticas obtenidas');
-
-    res.json({
-      success: true,
-      estadisticas: {
-        por_estado: estadisticasPorEstado,
-        por_mes: pedidosPorMes,
-        totales: totalesGenerales[0] || { total_pedidos: 0, total_ventas: 0, promedio_pedido: 0 }
-      }
-    });
-
-  } catch (error) {
-    console.error('❌ Error al obtener estadísticas:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al obtener estadísticas de pedidos',
-      error: error.message
-    });
-  }
-};
 export const eliminarDetalleProducto = async (req, res) => {
   const connection = await pool.getConnection();
-  
+
   try {
     const { id } = req.params; // id_detalle_producto
 
@@ -1137,7 +940,7 @@ export const eliminarDetalleProducto = async (req, res) => {
       if (pedidosRelacionados[0].count > 0) {
         await connection.rollback();
         console.log(`❌ No se puede eliminar: ${pedidosRelacionados[0].count} pedido(s) asociado(s)`);
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: 'No se puede eliminar este detalle porque está asociado a pedidos existentes',
           detalles: `Hay ${pedidosRelacionados[0].count} pedido(s) que incluyen este producto`,
           tipo: 'PEDIDOS_ASOCIADOS'
@@ -1152,7 +955,7 @@ export const eliminarDetalleProducto = async (req, res) => {
         'DELETE FROM detalle_estado_pro WHERE producto_detalle_id_detalle_producto = ?',
         [id]
       );
-      
+
       console.log(`✅ Eliminados ${estadosEliminados.affectedRows} registros de estados`);
 
       // PASO 3: Verificar otras posibles dependencias (agregar según tu esquema)
@@ -1184,10 +987,10 @@ export const eliminarDetalleProducto = async (req, res) => {
 
       // Confirmar transacción
       await connection.commit();
-      
+
       console.log('✅ Detalle de producto eliminado correctamente');
-      
-      res.json({ 
+
+      res.json({
         message: 'Detalle eliminado correctamente',
         eliminados: {
           estados: estadosEliminados.affectedRows,
@@ -1204,17 +1007,17 @@ export const eliminarDetalleProducto = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Error al eliminar detalle:', error);
-    
+
     // Manejo específico de errores de foreign key
     if (error.code === 'ER_ROW_IS_REFERENCED_2') {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'No se puede eliminar este detalle porque tiene datos relacionados',
         detalles: 'El detalle está siendo referenciado por otros registros en el sistema',
         tipo: 'FOREIGN_KEY_CONSTRAINT'
       });
     }
-    
-    res.status(500).json({ 
+
+    res.status(500).json({
       error: 'Error interno del servidor',
       details: error.message,
       tipo: 'INTERNAL_ERROR'
@@ -1232,8 +1035,8 @@ export const actualizarDetalleProducto = async (req, res) => {
 
     // Validaciones
     if (!marca_id || !talla_id || precio === undefined || stock === undefined) {
-      return res.status(400).json({ 
-        error: 'Marca, talla, precio y stock son obligatorios' 
+      return res.status(400).json({
+        error: 'Marca, talla, precio y stock son obligatorios'
       });
     }
 
@@ -1271,9 +1074,9 @@ export const actualizarDetalleProducto = async (req, res) => {
 
   } catch (error) {
     console.error('Error al actualizar detalle:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Error interno del servidor',
-      details: error.message 
+      details: error.message
     });
   }
 };
@@ -1285,8 +1088,8 @@ export const crearDetalleProducto = async (req, res) => {
 
     // Validaciones
     if (!producto_id || !marca_id || !talla_id || precio === undefined || stock === undefined) {
-      return res.status(400).json({ 
-        error: 'Producto ID, marca, talla, precio y stock son obligatorios' 
+      return res.status(400).json({
+        error: 'Producto ID, marca, talla, precio y stock son obligatorios'
       });
     }
 
@@ -1305,8 +1108,8 @@ export const crearDetalleProducto = async (req, res) => {
     );
 
     if (existeCombinacion.length > 0) {
-      return res.status(400).json({ 
-        error: 'Ya existe un detalle para este producto con esta marca y talla' 
+      return res.status(400).json({
+        error: 'Ya existe un detalle para este producto con esta marca y talla'
       });
     }
 
@@ -1320,16 +1123,16 @@ export const crearDetalleProducto = async (req, res) => {
       producto_id, marca_id, talla_id, precio, stock
     ]);
 
-    res.status(201).json({ 
+    res.status(201).json({
       message: 'Detalle creado correctamente',
       id_detalle_producto: result.insertId
     });
 
   } catch (error) {
     console.error('Error al crear detalle:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Error interno del servidor',
-      details: error.message 
+      details: error.message
     });
   }
 };
@@ -1374,9 +1177,9 @@ export const actualizarEstadosProducto = async (req, res) => {
 
   } catch (error) {
     console.error('Error al actualizar estados:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Error interno del servidor',
-      details: error.message 
+      details: error.message
     });
   }
 };
@@ -1447,7 +1250,7 @@ export const obtenerProductoPorId = async (req, res) => {
 export const obtenerProductoParaEdicionSimple = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     console.log('🔍 Obteniendo producto para edición (versión simple), ID:', id);
 
     // Consulta simplificada sin joins complejos de estado
@@ -1481,21 +1284,21 @@ export const obtenerProductoParaEdicionSimple = async (req, res) => {
     const [rows] = await pool.execute(query, [id]);
 
     if (rows.length === 0) {
-      return res.status(404).json({ 
-        error: 'Producto no encontrado' 
+      return res.status(404).json({
+        error: 'Producto no encontrado'
       });
     }
 
     console.log('📋 Producto encontrado con', rows.length, 'variantes');
-    
+
     // Retornar directamente el array (mismo formato que listarProductos)
     res.json(rows);
 
   } catch (error) {
     console.error('❌ Error al obtener producto para edición:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Error interno del servidor',
-      details: error.message 
+      details: error.message
     });
   }
 };
@@ -1576,9 +1379,9 @@ export const actualizarEstadoProducto = async (req, res) => {
     }
 
     // Insertar en el historial de cambios de estado
-    const descripcionFinal = descripcion_cambio || 
+    const descripcionFinal = descripcion_cambio ||
       `Estado cambiado manualmente a ${estado_id === 1 ? 'Disponible' : 'Inhabilitado'} - ${new Date().toLocaleString()}`;
-    
+
     const insertHistorialQuery = `
       INSERT INTO detalle_estado_pro (
         fecha_cb_estado,
@@ -1659,20 +1462,20 @@ export const actualizarEstadosAutomaticos = async (req, res) => {
     for (const producto of productos) {
       const estadoActual = parseInt(producto.estado_actual);
       const stockTotal = parseInt(producto.stock_total);
-      
+
       // NUEVA LÓGICA: Solo cambiar entre Disponible (1) y Agotado (2)
       let nuevoEstado = null;
-      
+
       if (estadoActual === 1 && stockTotal === 0) {
         nuevoEstado = 2; // Disponible → Agotado
       } else if (estadoActual === 2 && stockTotal > 0) {
         nuevoEstado = 1; // Agotado → Disponible
       }
-      
+
       if (nuevoEstado && nuevoEstado !== estadoActual) {
         // Actualizar estado
         const descripcion = `Estado actualizado automáticamente: ${nuevoEstado === 1 ? 'Disponible' : 'Agotado'} (Stock: ${stockTotal}) - ${new Date().toLocaleString()}`;
-        
+
         const insertQuery = `
           INSERT INTO detalle_estado_pro (
             fecha_cb_estado,
@@ -1703,7 +1506,7 @@ export const actualizarEstadosAutomaticos = async (req, res) => {
           estadoNuevo: nuevoEstado,
           stock: stockTotal
         });
-        
+
         console.log(`📦 Producto "${producto.nombre_producto}": Estado ${estadoActual} → ${nuevoEstado} (Stock: ${stockTotal})`);
       }
     }
@@ -1836,7 +1639,7 @@ export const actualizarDatosBasicosProductoConEstado = async (req, res) => {
 
       // Actualizar estado del producto (crear entrada en historial)
       const descripcionEstado = `Datos básicos actualizados con cambio de estado a ${estado_id === 1 ? 'Disponible' : 'Inhabilitado'} - ${new Date().toLocaleString()}`;
-      
+
       const insertEstadoQuery = `
         INSERT INTO detalle_estado_pro (
           fecha_cb_estado,
@@ -1964,7 +1767,7 @@ export const getProductosActivosPublicos = async (req, res) => {
     const [productos] = await pool.execute(query);
 
     console.log(`✅ Productos activos para público obtenidos: ${productos.length}`);
-    
+
     res.status(200).json({
       productos: productos,
       total: productos.length,
@@ -1988,7 +1791,7 @@ export const getProductosActivosPublicos = async (req, res) => {
 export const obtenerProductoParaEdicion = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     console.log('🔍 Obteniendo producto para edición, ID:', id);
 
     // Consulta corregida que obtiene el estado actual del producto
@@ -2042,8 +1845,8 @@ export const obtenerProductoParaEdicion = async (req, res) => {
     const [rows] = await pool.execute(query, [id]);
 
     if (rows.length === 0) {
-      return res.status(404).json({ 
-        error: 'Producto no encontrado' 
+      return res.status(404).json({
+        error: 'Producto no encontrado'
       });
     }
 
@@ -2054,14 +1857,14 @@ export const obtenerProductoParaEdicion = async (req, res) => {
       nombre_estado: rows[0].nombre_estado,
       variantes: rows.filter(r => r.id_detalle).length
     });
-    
+
     res.json(rows);
 
   } catch (error) {
     console.error('❌ Error al obtener producto para edición:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Error interno del servidor',
-      details: error.message 
+      details: error.message
     });
   }
 };
@@ -2072,7 +1875,7 @@ export const obtenerProductoParaEdicion = async (req, res) => {
  */
 export const actualizarDatosBasicosProducto = async (req, res) => {
   const connection = await pool.getConnection();
-  
+
   try {
     const { id } = req.params;
     const { nombre, descripcion, imagen_url, categoria_id, estado_id } = req.body;
@@ -2186,7 +1989,7 @@ export const actualizarDatosBasicosProducto = async (req, res) => {
 
       // Insertar nuevo estado para todas las variantes
       const descripcionEstado = `Estado cambiado a ${estadoExiste[0].nombre_estado} desde actualización de datos básicos - ${new Date().toLocaleString()}`;
-      
+
       for (const variante of variantes) {
         await connection.execute(`
           INSERT INTO detalle_estado_pro (
@@ -2229,7 +2032,7 @@ export const actualizarDatosBasicosProducto = async (req, res) => {
  */
 export const cambiarEstadoProducto = async (req, res) => {
   const connection = await pool.getConnection();
-  
+
   try {
     const { id } = req.params;
     const { estado_id, descripcion_cambio } = req.body;
@@ -2270,7 +2073,7 @@ export const cambiarEstadoProducto = async (req, res) => {
         error: 'Estado no válido',
         estados_validos: {
           1: 'Disponible',
-          2: 'Agotado', 
+          2: 'Agotado',
           3: 'Inhabilitado'
         }
       });
@@ -2342,9 +2145,9 @@ export const cambiarEstadoProducto = async (req, res) => {
     }
 
     // Insertar nuevo estado para todas las variantes
-    const descripcionFinal = descripcion_cambio || 
+    const descripcionFinal = descripcion_cambio ||
       `Estado cambiado manualmente a ${estadoInfo[0].nombre_estado} - ${new Date().toLocaleString()}`;
-    
+
     for (const variante of variantes) {
       await connection.execute(`
         INSERT INTO detalle_estado_pro (
@@ -2490,7 +2293,7 @@ export const obtenerEstadosProducto = async (req, res) => {
  */
 export const aplicarLogicaAutomaticaEstados = async (req, res) => {
   const connection = await pool.getConnection();
-  
+
   try {
     console.log('🤖 Aplicando lógica automática de estados...');
 
@@ -2531,14 +2334,14 @@ export const aplicarLogicaAutomaticaEstados = async (req, res) => {
     for (const producto of productos) {
       const estadoActual = producto.estado_actual_id || 1; // Por defecto Disponible
       const stockTotal = parseInt(producto.stock_total);
-      
+
       let nuevoEstado = null;
-      
+
       // LÓGICA AUTOMÁTICA:
       // - Si stock = 0 y estado != Inhabilitado → Agotado
       // - Si stock > 0 y estado = Agotado → Disponible
       // - No tocar productos Inhabilitados (estado 3)
-      
+
       if (estadoActual !== 3) { // Solo si no está inhabilitado
         if (stockTotal === 0 && estadoActual !== 2) {
           nuevoEstado = 2; // Cambiar a Agotado
@@ -2546,7 +2349,7 @@ export const aplicarLogicaAutomaticaEstados = async (req, res) => {
           nuevoEstado = 1; // Cambiar a Disponible
         }
       }
-      
+
       if (nuevoEstado && nuevoEstado !== estadoActual) {
         // Obtener variantes del producto
         const [variantes] = await connection.execute(
@@ -2557,7 +2360,7 @@ export const aplicarLogicaAutomaticaEstados = async (req, res) => {
         if (variantes.length > 0) {
           const nombreNuevoEstado = nuevoEstado === 1 ? 'Disponible' : 'Agotado';
           const descripcion = `Estado actualizado automáticamente a ${nombreNuevoEstado} (Stock: ${stockTotal}) - ${new Date().toLocaleString()}`;
-          
+
           // Insertar nuevo estado para todas las variantes
           for (const variante of variantes) {
             await connection.execute(`
@@ -2585,7 +2388,7 @@ export const aplicarLogicaAutomaticaEstados = async (req, res) => {
             stock: stockTotal,
             variantes: variantes.length
           });
-          
+
           console.log(`📦 ${producto.nombre_producto}: ${producto.estado_actual_nombre || 'Disponible'} → ${nombreNuevoEstado} (Stock: ${stockTotal})`);
         }
       }
@@ -2669,7 +2472,7 @@ export const listarProductos = async (req, res) => {
     `);
 
     console.log(`📋 Productos obtenidos: ${productos.length} registros`);
-    
+
     // Debug: mostrar primeros productos con su estado
     if (productos.length > 0) {
       console.log('🔍 Primeros 3 productos con estados:');
@@ -2688,7 +2491,7 @@ export const listarProductos = async (req, res) => {
 // FUNCIÓN ADICIONAL: Verificar y corregir estados automáticamente
 export const verificarYCorregirEstados = async (req, res) => {
   const connection = await pool.getConnection();
-  
+
   try {
     console.log('🔍 Verificando estados de productos...');
 
@@ -2745,7 +2548,7 @@ export const verificarYCorregirEstados = async (req, res) => {
 
         // Aplicar lógica automática solo si no está inhabilitado
         let nuevoEstado = null;
-        
+
         if (estadoActualId !== 3) { // No es inhabilitado
           if (stockTotal === 0 && estadoActualId !== 2) {
             nuevoEstado = 2; // Cambiar a Agotado
@@ -2761,7 +2564,7 @@ export const verificarYCorregirEstados = async (req, res) => {
           );
 
           const nombreNuevoEstado = nuevoEstado === 1 ? 'Disponible' : 'Agotado';
-          
+
           for (const variante of variantes) {
             await connection.execute(`
               INSERT INTO detalle_estado_pro (
@@ -2810,7 +2613,7 @@ export const verificarYCorregirEstados = async (req, res) => {
 // FUNCIÓN DE MANTENIMIENTO: Limpiar estados inconsistentes
 export const limpiarEstadosInconsistentes = async (req, res) => {
   const connection = await pool.getConnection();
-  
+
   try {
     console.log('🧹 Limpiando estados inconsistentes...');
 
@@ -2835,7 +2638,7 @@ export const limpiarEstadosInconsistentes = async (req, res) => {
     `);
 
     let estadosCreados = 0;
-    
+
     for (const producto of productosSinEstado) {
       const [variantes] = await connection.execute(
         'SELECT id_detalle_producto FROM producto_detalle WHERE producto_id_producto = ?',
@@ -2851,7 +2654,7 @@ export const limpiarEstadosInconsistentes = async (req, res) => {
             estado_producto_id_estado
           ) VALUES (NOW(), 'Estado creado durante limpieza de inconsistencias', ?, 1)
         `, [variante.id_detalle_producto]);
-        
+
         estadosCreados++;
       }
 
@@ -2876,6 +2679,644 @@ export const limpiarEstadosInconsistentes = async (req, res) => {
       success: false,
       error: 'Error al limpiar estados inconsistentes',
       details: error.message
+    });
+  } finally {
+    connection.release();
+  }
+};
+
+// Obtener ID de estado por nombre
+const getEstadoIdByName = async (nombreEstado) => {
+  const [estado] = await pool.execute(
+    'SELECT id_estado FROM estado_pedido WHERE nombre_estado = ?',
+    [nombreEstado]
+  );
+  return estado.length > 0 ? estado[0].id_estado : null;
+};
+
+// Crear registro de cambio de estado
+const crearCambioEstado = async (connection, pedidoId, estadoId, descripcion = '') => {
+  await connection.execute(`
+    INSERT INTO detalle_estado (fecha_cb_estado, descripcion_cb_estado, pedido_id_pedido, estado_pedido_id_estado)
+    VALUES (NOW(), ?, ?, ?)
+  `, [descripcion, pedidoId, estadoId]);
+};
+
+// Obtener estado actual de un pedido
+const getEstadoActualPedido = async (pedidoId) => {
+  const [estado] = await pool.execute(`
+    SELECT ep.nombre_estado, ep.id_estado, de.fecha_cb_estado
+    FROM detalle_estado de
+    JOIN estado_pedido ep ON de.estado_pedido_id_estado = ep.id_estado
+    WHERE de.pedido_id_pedido = ?
+    ORDER BY de.fecha_cb_estado DESC, de.id_detalle_estado DESC
+    LIMIT 1
+  `, [pedidoId]);
+
+  return estado.length > 0 ? estado[0] : null;
+};
+
+// ============================================
+// FUNCIONES PRINCIPALES
+// ============================================
+// Confirmar pago en efectivo para una reserva
+export const confirmarPagoEfectivo = async (req, res) => {
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const { pedido_id } = req.params;
+
+    console.log('=== CONFIRMANDO PAGO EN EFECTIVO ===');
+    console.log('📦 Pedido ID:', pedido_id);
+
+    // Verificar que el pedido esté en estado Reservado
+    const estadoActual = await getEstadoActualPedido(pedido_id);
+
+    if (!estadoActual || estadoActual.nombre_estado !== 'Reservado') {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'El pedido no está en estado Reservado'
+      });
+    }
+
+    // Cambiar estado a Pagado
+    const estadoPagadoId = await getEstadoIdByName('Pagado');
+
+    if (!estadoPagadoId) {
+      throw new Error('Estado "Pagado" no encontrado en la base de datos');
+    }
+
+    await crearCambioEstado(
+      connection,
+      pedido_id,
+      estadoPagadoId,
+      'Pago en efectivo confirmado por administrador'
+    );
+
+    // Actualizar la fecha de venta (confirmar el pago)
+    await connection.execute(`
+      UPDATE venta 
+      SET fecha_venta = NOW() 
+      WHERE pedido_id_pedido = ?
+    `, [pedido_id]);
+
+    await connection.commit();
+
+    console.log('✅ Pago confirmado exitosamente');
+
+    res.json({
+      success: true,
+      message: 'Pago confirmado exitosamente'
+    });
+
+  } catch (error) {
+    await connection.rollback();
+    console.error('❌ Error al confirmar pago:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al confirmar el pago',
+      error: error.message
+    });
+  } finally {
+    connection.release();
+  }
+};
+
+// Cambiar estado de un pedido
+export const cambiarEstadoPedido = async (req, res) => {
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const { pedido_id } = req.params;
+    const { nuevo_estado, descripcion } = req.body;
+
+    console.log('=== CAMBIANDO ESTADO DE PEDIDO ===');
+    console.log('📦 Pedido ID:', pedido_id);
+    console.log('🔄 Nuevo estado:', nuevo_estado);
+
+    // Validar que el nuevo estado sea válido
+    const estadosValidos = ['Pendiente', 'Pagado', 'Preparado', 'Enviado', 'Entregado', 'Cancelado'];
+
+    if (!estadosValidos.includes(nuevo_estado)) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'Estado no válido'
+      });
+    }
+
+    // Obtener ID del nuevo estado
+    const nuevoEstadoId = await getEstadoIdByName(nuevo_estado);
+
+    if (!nuevoEstadoId) {
+      throw new Error(`Estado "${nuevo_estado}" no encontrado en la base de datos`);
+    }
+
+    // Verificar el estado actual
+    const estadoActual = await getEstadoActualPedido(pedido_id);
+
+    if (!estadoActual) {
+      await connection.rollback();
+      return res.status(404).json({
+        success: false,
+        message: 'Pedido no encontrado'
+      });
+    }
+
+    // Validar transiciones de estado permitidas
+    const transicionesPermitidas = {
+      'Pendiente': ['Pagado', 'Cancelado'],
+      'Reservado': ['Pagado', 'Cancelado'],
+      'Pagado': ['Preparado', 'Cancelado'],
+      'Preparado': ['Entregado'],
+      'Enviado': ['Entregado'],
+      'Entregado': [],
+      'Cancelado': []
+    };
+
+    const permitidas = transicionesPermitidas[estadoActual.nombre_estado] || [];
+
+    if (!permitidas.includes(nuevo_estado)) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        message: `No se puede cambiar de "${estadoActual.nombre_estado}" a "${nuevo_estado}"`
+      });
+    }
+
+    // Crear registro de cambio de estado
+    await crearCambioEstado(
+      connection,
+      pedido_id,
+      nuevoEstadoId,
+      descripcion || `Cambio de estado a ${nuevo_estado}`
+    );
+
+    await connection.commit();
+
+    console.log('✅ Estado cambiado exitosamente');
+
+    res.json({
+      success: true,
+      message: 'Estado actualizado exitosamente'
+    });
+
+  } catch (error) {
+    await connection.rollback();
+    console.error('❌ Error al cambiar estado:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al cambiar el estado del pedido',
+      error: error.message
+    });
+  } finally {
+    connection.release();
+  }
+};
+
+// Cancelar una reserva
+export const cancelarReserva = async (req, res) => {
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const { pedido_id } = req.params;
+    const { motivo } = req.body;
+
+    console.log('=== CANCELANDO RESERVA ===');
+    console.log('📦 Pedido ID:', pedido_id);
+    console.log('📝 Motivo:', motivo);
+
+    // Verificar que esté en estado Reservado
+    const estadoActual = await getEstadoActualPedido(pedido_id);
+
+    if (!estadoActual || estadoActual.nombre_estado !== 'Reservado') {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'El pedido no está en estado Reservado'
+      });
+    }
+
+    // Cambiar a estado Cancelado
+    const estadoCanceladoId = await getEstadoIdByName('Cancelado');
+
+    if (!estadoCanceladoId) {
+      throw new Error('Estado "Cancelado" no encontrado en la base de datos');
+    }
+
+    await crearCambioEstado(
+      connection,
+      pedido_id,
+      estadoCanceladoId,
+      motivo || 'Reserva cancelada por administrador'
+    );
+
+    // Opcional: Devolver stock de productos
+    // Esto dependerá de tu lógica de negocio
+
+    await connection.commit();
+
+    console.log('✅ Reserva cancelada exitosamente');
+
+    res.json({
+      success: true,
+      message: 'Reserva cancelada exitosamente'
+    });
+
+  } catch (error) {
+    await connection.rollback();
+    console.error('❌ Error al cancelar reserva:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al cancelar la reserva',
+      error: error.message
+    });
+  } finally {
+    connection.release();
+  }
+};
+
+// Obtener estadísticas de pedidos
+export const getEstadisticasPedidos = async (req, res) => {
+  try {
+    console.log('=== OBTENIENDO ESTADÍSTICAS DE PEDIDOS ===');
+
+    // Contar pedidos por estado
+    const [estadisticas] = await pool.execute(`
+      SELECT 
+        ep.nombre_estado,
+        COUNT(DISTINCT p.id_pedido) as cantidad,
+        COALESCE(SUM(p.total), 0) as total_ventas
+      FROM pedido p
+      JOIN detalle_estado de ON p.id_pedido = de.pedido_id_pedido
+      JOIN estado_pedido ep ON de.estado_pedido_id_estado = ep.id_estado
+      WHERE de.id_detalle_estado = (
+        SELECT MAX(de2.id_detalle_estado)
+        FROM detalle_estado de2
+        WHERE de2.pedido_id_pedido = p.id_pedido
+      )
+      AND ep.nombre_estado != 'Carrito'
+      GROUP BY ep.nombre_estado, ep.id_estado
+      ORDER BY ep.id_estado
+    `);
+
+    // Total general
+    const [totales] = await pool.execute(`
+      SELECT 
+        COUNT(DISTINCT p.id_pedido) as total_pedidos,
+        COALESCE(SUM(p.total), 0) as total_ventas
+      FROM pedido p
+      JOIN detalle_estado de ON p.id_pedido = de.pedido_id_pedido
+      JOIN estado_pedido ep ON de.estado_pedido_id_estado = ep.id_estado
+      WHERE de.id_detalle_estado = (
+        SELECT MAX(de2.id_detalle_estado)
+        FROM detalle_estado de2
+        WHERE de2.pedido_id_pedido = p.id_pedido
+      )
+      AND ep.nombre_estado IN ('Pagado', 'Preparado', 'Enviado', 'Entregado')
+    `);
+
+    console.log('✅ Estadísticas obtenidas');
+
+    res.json({
+      success: true,
+      estadisticas: {
+        por_estado: estadisticas,
+        totales: totales[0]
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error al obtener estadísticas:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener estadísticas',
+      error: error.message
+    });
+  }
+};
+// CORRECCIONES PRINCIPALES PARA adminController.js
+// 1. CORREGIR LA FUNCIÓN getReservasActivas
+export const getReservasActivas = async (req, res) => {
+  try {
+    const [reservas] = await pool.execute(`
+      SELECT 
+        p.id_pedido,
+        p.fecha_pedido,
+        p.total,
+        p.codigo_reserva, -- SIN TILDE
+        u.nombre_usuario,
+        u.apellido_usuario,
+        u.rut,
+        u.correo,
+        u.direccion,
+        v.fecha_venta,
+        mp.nombre_metodo as metodo_pago,
+        COUNT(dp.id_detalle) as cantidad_productos,
+        GROUP_CONCAT(
+          CONCAT(prod.nombre_producto, ' x', dp.cantidad) 
+          SEPARATOR ', '
+        ) as productos_resumen
+      FROM pedido p
+      JOIN usuario u ON p.usuario_id_usuario = u.id_usuario
+      JOIN detalle_estado de ON p.id_pedido = de.pedido_id_pedido
+      JOIN estado_pedido ep ON de.estado_pedido_id_estado = ep.id_estado
+      LEFT JOIN venta v ON p.id_pedido = v.pedido_id_pedido
+      LEFT JOIN metodo_pago mp ON v.metodo_pago_id_metodo = mp.id_metodo
+      LEFT JOIN detalle_pedido dp ON p.id_pedido = dp.pedido_id_pedido
+      LEFT JOIN producto_detalle pd ON dp.producto_detalle_id_detalle_producto = pd.id_detalle_producto
+      LEFT JOIN producto prod ON pd.producto_id_producto = prod.id_producto
+      WHERE ep.nombre_estado = 'Reservado'
+      AND de.id_detalle_estado = (
+        SELECT MAX(de2.id_detalle_estado)
+        FROM detalle_estado de2
+        WHERE de2.pedido_id_pedido = p.id_pedido
+      )
+      GROUP BY p.id_pedido, p.fecha_pedido, p.total, p.codigo_reserva,
+               u.nombre_usuario, u.apellido_usuario, u.rut, u.correo, u.direccion, 
+               v.fecha_venta, mp.nombre_metodo
+      ORDER BY p.fecha_pedido DESC
+    `);
+
+    // Generar código de reserva si no existe
+    const reservasConCodigo = reservas.map(reserva => ({
+      ...reserva,
+      codigo_reserva: reserva.codigo_reserva || `RES-${reserva.id_pedido}-${Date.now().toString(36).toUpperCase()}`
+    }));
+
+    res.json({
+      success: true,
+      reservas: reservasConCodigo
+    });
+
+  } catch (error) {
+    console.error('Error al obtener reservas:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener reservas activas'
+    });
+  }
+};
+
+// 2. CORREGIR LA FUNCIÓN getPedidos
+export const getPedidos = async (req, res) => {
+  try {
+    console.log('=== OBTENIENDO TODOS LOS PEDIDOS ===');
+
+    const [pedidos] = await pool.execute(`
+      SELECT 
+        p.id_pedido,
+        p.fecha_pedido,
+        p.total,
+        p.codigo_reserva, -- SIN TILDE
+        u.id_usuario,
+        u.nombre_usuario,
+        u.apellido_usuario,
+        u.correo,
+        u.rut,
+        u.direccion,
+        r.nombre_region,
+        ep.nombre_estado,
+        ep.descripcion_estado,
+        de.fecha_cb_estado,
+        mp.nombre_metodo as metodo_pago_nombre,
+        COUNT(DISTINCT dp.id_detalle) as cantidad_productos,
+        GROUP_CONCAT(
+            DISTINCT CONCAT(
+                prod.nombre_producto, ' (',
+                m.nombre_marca, ' - ',
+                t.nombre_talla, ') x',
+                dp.cantidad
+            ) SEPARATOR ', '
+        ) as productos_resumen,
+        MIN(prod.imagen_url) as imagen_principal
+      FROM pedido p 
+      JOIN usuario u ON p.usuario_id_usuario = u.id_usuario 
+      JOIN region r ON u.region_id_region = r.id_region 
+      JOIN detalle_estado de ON p.id_pedido = de.pedido_id_pedido 
+      JOIN estado_pedido ep ON de.estado_pedido_id_estado = ep.id_estado 
+      LEFT JOIN venta v ON p.id_pedido = v.pedido_id_pedido 
+      LEFT JOIN metodo_pago mp ON v.metodo_pago_id_metodo = mp.id_metodo 
+      LEFT JOIN detalle_pedido dp ON p.id_pedido = dp.pedido_id_pedido 
+      LEFT JOIN producto_detalle pd ON dp.producto_detalle_id_detalle_producto = pd.id_detalle_producto
+      LEFT JOIN producto prod ON pd.producto_id_producto = prod.id_producto 
+      LEFT JOIN marca m ON pd.marca_id_marca = m.id_marca 
+      LEFT JOIN talla t ON pd.talla_id_talla = t.id_talla 
+      WHERE de.id_detalle_estado = (
+          SELECT MAX(de2.id_detalle_estado)
+          FROM detalle_estado de2
+          WHERE de2.pedido_id_pedido = p.id_pedido
+      )
+      AND ep.nombre_estado != 'Carrito'
+      GROUP BY 
+          p.id_pedido, p.fecha_pedido, p.total, p.codigo_reserva, -- SIN TILDE
+          u.id_usuario, u.nombre_usuario, u.apellido_usuario, u.correo, u.rut, u.direccion,
+          r.nombre_region,
+          ep.nombre_estado, ep.descripcion_estado, de.fecha_cb_estado,
+          mp.nombre_metodo
+      ORDER BY p.fecha_pedido DESC
+    `);
+
+    // Procesar pedidos para asegurar consistencia de códigos
+    const pedidosProcesados = pedidos.map(pedido => {
+      // Si es una reserva y no tiene código, generarlo
+      if (pedido.nombre_estado === 'Reservado' && !pedido.codigo_reserva) {
+        pedido.codigo_reserva = `RES-${pedido.id_pedido}-${Date.now().toString(36).toUpperCase().substring(0, 6)}`;
+      }
+      return pedido;
+    });
+
+    console.log(`✅ ${pedidosProcesados.length} pedidos encontrados`);
+
+    res.json({
+      success: true,
+      pedidos: pedidosProcesados
+    });
+
+  } catch (error) {
+    console.error('❌ Error al obtener pedidos:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener los pedidos',
+      error: error.message
+    });
+  }
+};
+
+// 3. CORREGIR LA FUNCIÓN getDetallePedido
+export const getDetallePedido = async (req, res) => {
+  try {
+    const { pedido_id } = req.params;
+
+    console.log('=== OBTENIENDO DETALLE DE PEDIDO ===');
+    console.log('📦 Pedido ID:', pedido_id);
+
+    // Información general del pedido
+    const [pedidoInfo] = await pool.execute(`
+      SELECT 
+        p.id_pedido,
+        p.fecha_pedido,
+        p.total,
+        p.codigo_reserva, -- SIN TILDE
+        u.nombre_usuario,
+        u.apellido_usuario,
+        u.correo,
+        u.rut,
+        u.direccion,
+        r.nombre_region,
+        c.nombre_comuna
+      FROM pedido p
+      JOIN usuario u ON p.usuario_id_usuario = u.id_usuario
+      LEFT JOIN region r ON u.region_id_region = r.id_region
+      LEFT JOIN comuna c ON u.comuna_id_comuna = c.id_comuna
+      WHERE p.id_pedido = ?
+    `, [pedido_id]);
+
+    if (pedidoInfo.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Pedido no encontrado'
+      });
+    }
+
+    // Obtener productos del pedido
+    const [productos] = await pool.execute(`
+      SELECT 
+        dp.cantidad,
+        pd.precio,
+        prod.nombre_producto,
+        prod.descripcion,
+        prod.imagen_url,
+        m.nombre_marca,
+        t.nombre_talla,
+        cat.nombre_categoria,
+        (dp.cantidad * pd.precio) as subtotal
+      FROM detalle_pedido dp
+      JOIN producto_detalle pd ON dp.producto_detalle_id_detalle_producto = pd.id_detalle_producto
+      JOIN producto prod ON pd.producto_id_producto = prod.id_producto
+      JOIN marca m ON pd.marca_id_marca = m.id_marca
+      JOIN talla t ON pd.talla_id_talla = t.id_talla
+      JOIN categoria cat ON prod.categoria_id_categoria = cat.id_categoria
+      WHERE dp.pedido_id_pedido = ?
+      ORDER BY prod.nombre_producto
+    `, [pedido_id]);
+
+    // Obtener historial de estados
+    const [seguimiento] = await pool.execute(`
+      SELECT 
+        de.fecha_cb_estado,
+        de.descripcion_cb_estado,
+        ep.id_estado,
+        ep.nombre_estado,
+        ep.descripcion_estado
+      FROM detalle_estado de
+      JOIN estado_pedido ep ON de.estado_pedido_id_estado = ep.id_estado
+      WHERE de.pedido_id_pedido = ?
+      ORDER BY de.fecha_cb_estado ASC, de.id_detalle_estado ASC
+    `, [pedido_id]);
+
+    // Obtener información de venta si existe
+    const [venta] = await pool.execute(`
+      SELECT 
+        v.fecha_venta,
+        mp.nombre_metodo as metodo_pago
+      FROM venta v
+      JOIN metodo_pago mp ON v.metodo_pago_id_metodo = mp.id_metodo
+      WHERE v.pedido_id_pedido = ?
+    `, [pedido_id]);
+
+    // Procesar el pedido
+    const pedidoProcesado = {
+      ...pedidoInfo[0],
+      codigo_reserva: pedidoInfo[0].codigo_reserva || 
+        (seguimiento.find(s => s.nombre_estado === 'Reservado') 
+          ? `RES-${pedido_id}-${Date.now().toString(36).toUpperCase().substring(0, 6)}` 
+          : null),
+      productos: productos,
+      seguimiento: seguimiento,
+      venta: venta.length > 0 ? venta[0] : null
+    };
+
+    console.log('✅ Detalle de pedido obtenido');
+
+    res.json({
+      success: true,
+      pedido: pedidoProcesado
+    });
+
+  } catch (error) {
+    console.error('❌ Error al obtener detalle del pedido:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener el detalle del pedido',
+      error: error.message
+    });
+  }
+};
+
+// 4. FUNCIÓN PARA GUARDAR CÓDIGO DE RESERVA EN BD
+export const actualizarCodigoReserva = async (pedidoId, codigoReserva) => {
+  try {
+    await pool.execute(
+      'UPDATE pedido SET codigo_reserva = ? WHERE id_pedido = ?', 
+      [codigoReserva, pedidoId]
+    );
+    return true;
+  } catch (error) {
+    console.error('Error al actualizar código de reserva:', error);
+    return false;
+  }
+};
+
+// 5. AL CREAR UNA RESERVA, GUARDAR EL CÓDIGO
+export const crearReserva = async (req, res) => {
+  const connection = await pool.getConnection();
+  
+  try {
+    await connection.beginTransaction();
+    
+    const { pedido_id } = req.params;
+    
+    // Generar código de reserva
+    const codigoReserva = `RES-${pedido_id}-${Date.now().toString(36).toUpperCase().substring(0, 6)}`;
+    
+    // Actualizar el pedido con el código de reserva
+    await connection.execute(
+      'UPDATE pedido SET codigo_reserva = ? WHERE id_pedido = ?', 
+      [codigoReserva, pedido_id]
+    );
+    
+    // Cambiar estado a Reservado
+    const estadoReservadoId = await getEstadoIdByName('Reservado');
+    
+    await crearCambioEstado(
+      connection,
+      pedido_id,
+      estadoReservadoId,
+      'Pedido reservado para pago en tienda'
+    );
+    
+    await connection.commit();
+    
+    res.json({
+      success: true,
+      message: 'Reserva creada exitosamente',
+      codigo_reserva: codigoReserva
+    });
+    
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error al crear reserva:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al crear la reserva'
     });
   } finally {
     connection.release();

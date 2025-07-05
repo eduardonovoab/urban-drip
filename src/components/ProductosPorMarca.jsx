@@ -43,11 +43,11 @@ const ProductosPorMarca = () => {
 
         if (data && typeof data === 'object') {
           productosData = data.productos || [];
-          nombreMarca = data.marcaNombre || data.marca_nombre || `Marca ${id}`;
+          nombreMarca = data.marcaNombre || data.marca_nombre || data.nombreMarca || '';
           total = data.total_productos || productosData.length;
         } else if (Array.isArray(data)) {
           productosData = data;
-          nombreMarca = `Marca ${id}`;
+          nombreMarca = '';
           total = data.length;
         } else {
           throw new Error('Estructura de respuesta inesperada del servidor');
@@ -57,11 +57,37 @@ const ProductosPorMarca = () => {
         const productosConEstado = procesarProductosConEstado(productosData);
         const productosUnicos = agruparProductosPorNombre(productosConEstado);
         
+        // Si no tenemos el nombre de la marca desde el backend, 
+        // intentar obtenerlo del primer producto o hacer una petición adicional
+        if (!nombreMarca && productosUnicos.length > 0) {
+          // Opción 1: Tomar el nombre de la marca del primer producto
+          nombreMarca = productosUnicos[0].marca || productosUnicos[0].nombre_marca || '';
+        }
+
+        // Opción 2: Si aún no tenemos el nombre, hacer una petición adicional para obtener los datos de la marca
+        if (!nombreMarca) {
+          try {
+            const marcaResponse = await fetch(`http://localhost:3000/api/marcas/${id}`);
+            if (marcaResponse.ok) {
+              const marcaData = await marcaResponse.json();
+              nombreMarca = marcaData.nombre || marcaData.nombre_marca || `Marca ${id}`;
+            }
+          } catch (err) {
+            console.log('No se pudo obtener información adicional de la marca');
+          }
+        }
+
+        // Si todavía no tenemos nombre, usar un valor por defecto
+        if (!nombreMarca) {
+          nombreMarca = `Marca ${id}`;
+        }
+        
         setProductos(productosUnicos);
         setMarcaNombre(nombreMarca);
         setTotalProductos(total);
         
         console.log(`✅ ${productosUnicos.length} productos únicos cargados de ${total} total`);
+        console.log(`📋 Nombre de la marca: ${nombreMarca}`);
         
       } catch (err) {
         console.error('❌ Error al cargar productos por marca:', err);

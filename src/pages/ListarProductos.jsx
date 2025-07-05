@@ -118,7 +118,7 @@ const ListarProductos = () => {
     }
     
     if (descontinuados > 0) {
-      return { id_estado: 3, nombre_estado: 'Descontinuado' };
+      return { id_estado: 3, nombre_estado: 'Inhabilitado' };
     }
 
     return { id_estado: 1, nombre_estado: 'Disponible' };
@@ -298,7 +298,7 @@ const ListarProductos = () => {
           <p className="stat-number warning">{estadisticas.productosAgotados}</p>
         </div>
         <div className="stat-card descontinuado">
-          <h3>Descontinuados</h3>
+          <h3>Inhabilitados</h3>
           <p className="stat-number error">{estadisticas.productosDescontinuados}</p>
         </div>
         <div className="stat-card">

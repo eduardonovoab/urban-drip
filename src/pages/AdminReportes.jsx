@@ -38,6 +38,7 @@ import {
   Download,
   Filter,
 } from "lucide-react"
+
 import "../styles/dashboard.css"
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
@@ -324,6 +325,340 @@ const AdminReportes = () => {
                       <td style="padding: 15px; color: #4a5568;">${producto.nombre_marca}</td>
                       <td style="padding: 15px; text-align: right; font-weight: 600; color: #1a202c;">${producto.cantidad_vendida?.toLocaleString("es-CL") || 0}</td>
                       <td style="padding: 15px; text-align: right; font-weight: 700; color: #38a169;">${formatCLP(producto.ingresos_producto)}</td>
+                    </tr>
+                  `,
+                    )
+                    .join("")}
+                </tbody>
+              </table>
+            </div>
+          `
+        }
+      }
+
+      // Añadir contenido para Inventario
+      if (activeTab === "inventario" && inventarioData) {
+        htmlContent += `
+          <div style="margin-bottom: 40px;">
+            <h2 style="color: #1a202c; font-size: 24px; margin-bottom: 20px; font-weight: 700;">Estadísticas de Inventario</h2>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;">
+              <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #667eea;">
+                <h3 style="color: #4a5568; font-size: 12px; text-transform: uppercase; margin-bottom: 8px;">Total Productos</h3>
+                <p style="color: #1a202c; font-size: 24px; font-weight: 800; margin: 0;">${inventarioData.estadisticas?.totalProductos?.toLocaleString("es-CL") || 0}</p>
+              </div>
+              <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #ef4444;">
+                <h3 style="color: #4a5568; font-size: 12px; text-transform: uppercase; margin-bottom: 8px;">Sin Stock</h3>
+                <p style="color: #1a202c; font-size: 24px; font-weight: 800; margin: 0;">${inventarioData.estadisticas?.sinStock?.toLocaleString("es-CL") || 0}</p>
+              </div>
+              <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #f59e0b;">
+                <h3 style="color: #4a5568; font-size: 12px; text-transform: uppercase; margin-bottom: 8px;">Stock Bajo</h3>
+                <p style="color: #1a202c; font-size: 24px; font-weight: 800; margin: 0;">${inventarioData.estadisticas?.stockBajo?.toLocaleString("es-CL") || 0}</p>
+              </div>
+              <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #38a169;">
+                <h3 style="color: #4a5568; font-size: 12px; text-transform: uppercase; margin-bottom: 8px;">Valor Inventario</h3>
+                <p style="color: #1a202c; font-size: 24px; font-weight: 800; margin: 0;">${formatCLP(inventarioData.estadisticas?.valorInventario)}</p>
+              </div>
+            </div>
+          </div>
+        `
+
+        // Productos sin stock
+        if (inventarioData.alertas?.sinStock && inventarioData.alertas.sinStock.length > 0) {
+          htmlContent += `
+            <div style="margin-bottom: 40px;">
+              <h2 style="color: #1a202c; font-size: 24px; margin-bottom: 20px; font-weight: 700;">Productos Sin Stock</h2>
+              <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <thead>
+                  <tr style="background: #f7fafc;">
+                    <th style="padding: 15px; text-align: left; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">Producto</th>
+                    <th style="padding: 15px; text-align: left; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">Marca</th>
+                    <th style="padding: 15px; text-align: center; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${inventarioData.alertas.sinStock
+                    .slice(0, 10)
+                    .map(
+                      (item) => `
+                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                      <td style="padding: 15px; font-weight: 600; color: #1a202c;">${item.nombre_producto}</td>
+                      <td style="padding: 15px; color: #4a5568;">${item.nombre_marca}</td>
+                      <td style="padding: 15px; text-align: center;">
+                        <span style="background: #fee2e2; color: #dc2626; padding: 4px 12px; border-radius: 9999px; font-weight: 600; font-size: 12px;">Sin Stock</span>
+                      </td>
+                    </tr>
+                  `,
+                    )
+                    .join("")}
+                </tbody>
+              </table>
+            </div>
+          `
+        }
+
+        // Productos con stock bajo
+        if (inventarioData.alertas?.stockBajo && inventarioData.alertas.stockBajo.length > 0) {
+          htmlContent += `
+            <div style="margin-bottom: 40px;">
+              <h2 style="color: #1a202c; font-size: 24px; margin-bottom: 20px; font-weight: 700;">Productos con Stock Bajo</h2>
+              <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <thead>
+                  <tr style="background: #f7fafc;">
+                    <th style="padding: 15px; text-align: left; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">Producto</th>
+                    <th style="padding: 15px; text-align: left; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">Marca</th>
+                    <th style="padding: 15px; text-align: center; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">Stock Actual</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${inventarioData.alertas.stockBajo
+                    .slice(0, 10)
+                    .map(
+                      (item) => `
+                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                      <td style="padding: 15px; font-weight: 600; color: #1a202c;">${item.nombre_producto}</td>
+                      <td style="padding: 15px; color: #4a5568;">${item.nombre_marca}</td>
+                      <td style="padding: 15px; text-align: center;">
+                        <span style="background: #fef3c7; color: #d97706; padding: 4px 12px; border-radius: 9999px; font-weight: 600;">${item.stock}</span>
+                      </td>
+                    </tr>
+                  `,
+                    )
+                    .join("")}
+                </tbody>
+              </table>
+            </div>
+          `
+        }
+      }
+
+      // Añadir contenido para Clientes
+      if (activeTab === "clientes" && clientesData) {
+        htmlContent += `
+          <div style="margin-bottom: 40px;">
+            <h2 style="color: #1a202c; font-size: 24px; margin-bottom: 20px; font-weight: 700;">Estadísticas de Clientes</h2>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;">
+              <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #667eea;">
+                <h3 style="color: #4a5568; font-size: 12px; text-transform: uppercase; margin-bottom: 8px;">Total Clientes</h3>
+                <p style="color: #1a202c; font-size: 24px; font-weight: 800; margin: 0;">${clientesData.estadisticas?.totalClientes?.toLocaleString("es-CL") || 0}</p>
+              </div>
+              <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #38a169;">
+                <h3 style="color: #4a5568; font-size: 12px; text-transform: uppercase; margin-bottom: 8px;">Cliente Top</h3>
+                <p style="color: #1a202c; font-size: 18px; font-weight: 800; margin: 0;">${clientesData.estadisticas?.clienteTop?.nombre_usuario || "N/A"}</p>
+              </div>
+              <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #805ad5;">
+                <h3 style="color: #4a5568; font-size: 12px; text-transform: uppercase; margin-bottom: 8px;">Región Top</h3>
+                <p style="color: #1a202c; font-size: 18px; font-weight: 800; margin: 0;">${clientesData.estadisticas?.regionTop?.nombre_region || "N/A"}</p>
+              </div>
+              <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #ed8936;">
+                <h3 style="color: #4a5568; font-size: 12px; text-transform: uppercase; margin-bottom: 8px;">Gasto Promedio</h3>
+                <p style="color: #1a202c; font-size: 24px; font-weight: 800; margin: 0;">${formatCLP(clientesData.estadisticas?.promedioGastoCliente)}</p>
+              </div>
+            </div>
+          </div>
+        `
+
+        if (clientesData.clientesTop && clientesData.clientesTop.length > 0) {
+          htmlContent += `
+            <div style="margin-bottom: 40px;">
+              <h2 style="color: #1a202c; font-size: 24px; margin-bottom: 20px; font-weight: 700;">Top 10 Clientes</h2>
+              <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <thead>
+                  <tr style="background: #f7fafc;">
+                    <th style="padding: 15px; text-align: left; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">#</th>
+                    <th style="padding: 15px; text-align: left; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">Cliente</th>
+                    <th style="padding: 15px; text-align: left; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">Email</th>
+                    <th style="padding: 15px; text-align: left; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">Región</th>
+                    <th style="padding: 15px; text-align: right; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">Pedidos</th>
+                    <th style="padding: 15px; text-align: right; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">Total Gastado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${clientesData.clientesTop
+                    .slice(0, 10)
+                    .map(
+                      (cliente, index) => `
+                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                      <td style="padding: 15px; font-weight: 600; color: #667eea;">${index + 1}</td>
+                      <td style="padding: 15px; font-weight: 600; color: #1a202c;">${cliente.nombre_usuario} ${cliente.apellido_usuario}</td>
+                      <td style="padding: 15px; color: #4a5568; font-size: 14px;">${cliente.correo}</td>
+                      <td style="padding: 15px;">
+                        <span style="background: #e0e7ff; color: #4338ca; padding: 4px 12px; border-radius: 9999px; font-weight: 600; font-size: 12px;">${cliente.nombre_region}</span>
+                      </td>
+                      <td style="padding: 15px; text-align: right; font-weight: 600;">${cliente.total_pedidos?.toLocaleString("es-CL") || 0}</td>
+                      <td style="padding: 15px; text-align: right; font-weight: 700; color: #38a169;">${formatCLP(cliente.total_gastado)}</td>
+                    </tr>
+                  `,
+                    )
+                    .join("")}
+                </tbody>
+              </table>
+            </div>
+          `
+        }
+
+        if (clientesData.distribucionGeografica && clientesData.distribucionGeografica.length > 0) {
+          htmlContent += `
+            <div style="margin-bottom: 40px;">
+              <h2 style="color: #1a202c; font-size: 24px; margin-bottom: 20px; font-weight: 700;">Distribución por Región</h2>
+              <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <thead>
+                  <tr style="background: #f7fafc;">
+                    <th style="padding: 15px; text-align: left; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">Región</th>
+                    <th style="padding: 15px; text-align: right; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">Total Clientes</th>
+                    <th style="padding: 15px; text-align: right; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">% del Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${clientesData.distribucionGeografica
+                    .map(
+                      (region) => `
+                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                      <td style="padding: 15px; font-weight: 600; color: #1a202c;">${region.nombre_region}</td>
+                      <td style="padding: 15px; text-align: right; font-weight: 600;">${region.total_clientes?.toLocaleString("es-CL") || 0}</td>
+                      <td style="padding: 15px; text-align: right; color: #4a5568;">
+                        ${((region.total_clientes / clientesData.estadisticas.totalClientes) * 100).toFixed(1)}%
+                      </td>
+                    </tr>
+                  `,
+                    )
+                    .join("")}
+                </tbody>
+              </table>
+            </div>
+          `
+        }
+      }
+
+      // Añadir contenido para Pedidos
+      if (activeTab === "pedidos" && pedidosData) {
+        htmlContent += `
+          <div style="margin-bottom: 40px;">
+            <h2 style="color: #1a202c; font-size: 24px; margin-bottom: 20px; font-weight: 700;">Estadísticas de Pedidos</h2>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;">
+              <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #667eea;">
+                <h3 style="color: #4a5568; font-size: 12px; text-transform: uppercase; margin-bottom: 8px;">Total Pedidos</h3>
+                <p style="color: #1a202c; font-size: 24px; font-weight: 800; margin: 0;">${pedidosData.estadisticas?.totalPedidos?.toLocaleString("es-CL") || 0}</p>
+              </div>
+              <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #38a169;">
+                <h3 style="color: #4a5568; font-size: 12px; text-transform: uppercase; margin-bottom: 8px;">Completados</h3>
+                <p style="color: #1a202c; font-size: 24px; font-weight: 800; margin: 0;">${pedidosData.estadisticas?.pedidosCompletados?.toLocaleString("es-CL") || 0}</p>
+              </div>
+              <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #f59e0b;">
+                <h3 style="color: #4a5568; font-size: 12px; text-transform: uppercase; margin-bottom: 8px;">Pendientes</h3>
+                <p style="color: #1a202c; font-size: 24px; font-weight: 800; margin: 0;">${pedidosData.estadisticas?.pedidosPendientes?.toLocaleString("es-CL") || 0}</p>
+              </div>
+              <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #805ad5;">
+                <h3 style="color: #4a5568; font-size: 12px; text-transform: uppercase; margin-bottom: 8px;">Eficiencia</h3>
+                <p style="color: #1a202c; font-size: 24px; font-weight: 800; margin: 0;">${pedidosData.estadisticas?.eficienciaEntrega || 0}%</p>
+              </div>
+            </div>
+          </div>
+        `
+
+        if (pedidosData.estadosPedidos && pedidosData.estadosPedidos.length > 0) {
+          htmlContent += `
+            <div style="margin-bottom: 40px;">
+              <h2 style="color: #1a202c; font-size: 24px; margin-bottom: 20px; font-weight: 700;">Estados de Pedidos</h2>
+              <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <thead>
+                  <tr style="background: #f7fafc;">
+                    <th style="padding: 15px; text-align: left; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">Estado</th>
+                    <th style="padding: 15px; text-align: right; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">Cantidad</th>
+                    <th style="padding: 15px; text-align: right; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">% del Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${pedidosData.estadosPedidos
+                    .map(
+                      (estado) => `
+                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                      <td style="padding: 15px;">
+                        <span style="
+                          background: ${
+                            estado.nombre_estado === 'Completado' ? '#d1fae5' :
+                            estado.nombre_estado === 'Pendiente' ? '#fef3c7' :
+                            estado.nombre_estado === 'En Proceso' ? '#dbeafe' :
+                            estado.nombre_estado === 'Cancelado' ? '#fee2e2' : '#f3f4f6'
+                          };
+                          color: ${
+                            estado.nombre_estado === 'Completado' ? '#065f46' :
+                            estado.nombre_estado === 'Pendiente' ? '#92400e' :
+                            estado.nombre_estado === 'En Proceso' ? '#1e40af' :
+                            estado.nombre_estado === 'Cancelado' ? '#991b1b' : '#374151'
+                          };
+                          padding: 4px 12px;
+                          border-radius: 9999px;
+                          font-weight: 600;
+                          font-size: 14px;
+                        ">${estado.nombre_estado}</span>
+                      </td>
+                      <td style="padding: 15px; text-align: right; font-weight: 600;">${estado.cantidad_pedidos?.toLocaleString("es-CL") || 0}</td>
+                      <td style="padding: 15px; text-align: right; color: #4a5568;">
+                        ${((estado.cantidad_pedidos / pedidosData.estadisticas.totalPedidos) * 100).toFixed(1)}%
+                      </td>
+                    </tr>
+                  `,
+                    )
+                    .join("")}
+                </tbody>
+              </table>
+            </div>
+          `
+        }
+      }
+
+      // Añadir contenido para Categorías
+      if (activeTab === "categorias" && categoriasData) {
+        htmlContent += `
+          <div style="margin-bottom: 40px;">
+            <h2 style="color: #1a202c; font-size: 24px; margin-bottom: 20px; font-weight: 700;">Estadísticas de Categorías</h2>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;">
+              <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #667eea;">
+                <h3 style="color: #4a5568; font-size: 12px; text-transform: uppercase; margin-bottom: 8px;">Total Categorías</h3>
+                <p style="color: #1a202c; font-size: 24px; font-weight: 800; margin: 0;">${categoriasData.estadisticas?.totalCategorias?.toLocaleString("es-CL") || 0}</p>
+              </div>
+              <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #38a169;">
+                <h3 style="color: #4a5568; font-size: 12px; text-transform: uppercase; margin-bottom: 8px;">Categoría Top</h3>
+                <p style="color: #1a202c; font-size: 18px; font-weight: 800; margin: 0;">${categoriasData.estadisticas?.categoriaTop?.nombre_categoria || "N/A"}</p>
+              </div>
+              <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #805ad5;">
+                <h3 style="color: #4a5568; font-size: 12px; text-transform: uppercase; margin-bottom: 8px;">Ingresos Totales</h3>
+                <p style="color: #1a202c; font-size: 24px; font-weight: 800; margin: 0;">${formatCLP(categoriasData.estadisticas?.ingresosTotales)}</p>
+              </div>
+              <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #ed8936;">
+                <h3 style="color: #4a5568; font-size: 12px; text-transform: uppercase; margin-bottom: 8px;">Más Productos</h3>
+                <p style="color: #1a202c; font-size: 18px; font-weight: 800; margin: 0;">${categoriasData.estadisticas?.categoriaMasProductos?.nombre_categoria || "N/A"}</p>
+              </div>
+            </div>
+          </div>
+        `
+
+        if (categoriasData.rendimientoCategorias && categoriasData.rendimientoCategorias.length > 0) {
+          htmlContent += `
+            <div style="margin-bottom: 40px;">
+              <h2 style="color: #1a202c; font-size: 24px; margin-bottom: 20px; font-weight: 700;">Rendimiento por Categoría</h2>
+              <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <thead>
+                  <tr style="background: #f7fafc;">
+                    <th style="padding: 15px; text-align: left; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">Categoría</th>
+                    <th style="padding: 15px; text-align: right; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">Productos</th>
+                    <th style="padding: 15px; text-align: right; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">Vendidos</th>
+                    <th style="padding: 15px; text-align: right; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">Ingresos</th>
+                    <th style="padding: 15px; text-align: right; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0;">% del Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${categoriasData.rendimientoCategorias
+                    .map(
+                      (categoria) => `
+                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                      <td style="padding: 15px; font-weight: 600; color: #1a202c;">${categoria.nombre_categoria}</td>
+                      <td style="padding: 15px; text-align: right;">${categoria.productos_categoria?.toLocaleString("es-CL") || 0}</td>
+                      <td style="padding: 15px; text-align: right; font-weight: 600;">${categoria.cantidad_vendida?.toLocaleString("es-CL") || 0}</td>
+                      <td style="padding: 15px; text-align: right; font-weight: 700; color: #38a169;">${formatCLP(categoria.ingresos_categoria)}</td>
+                      <td style="padding: 15px; text-align: right; color: #4a5568;">
+                        ${((categoria.ingresos_categoria / categoriasData.estadisticas.ingresosTotales) * 100).toFixed(1)}%
+                      </td>
                     </tr>
                   `,
                     )
@@ -1220,10 +1555,6 @@ const AdminReportes = () => {
             <button className="btn btn-primary" onClick={exportToPDF} disabled={loading}>
               <Download size={16} />
               {loading ? "Generando PDF..." : "Exportar PDF"}
-            </button>
-            <button className="btn btn-primary">
-              <Mail size={16} />
-              Enviar Reporte
             </button>
           </div>
         </div>

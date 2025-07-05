@@ -83,39 +83,43 @@ export const getDashboardGeneral = async (req, res) => {
     });
   }
 };
-
 // ========== REPORTE DE VENTAS ==========
 export const getReporteVentas = async (req, res) => {
   try {
     console.log('=== GENERANDO REPORTE DE VENTAS ===');
 
+    // Consulta para ventas por período (agrupado por mes y método de pago)
     const [ventasData] = await pool.execute(`
       SELECT 
         DATE_FORMAT(v.fecha_venta, '%Y-%m') as periodo,
+        mp.nombre_metodo as metodo_pago,
         COUNT(v.id_venta) as total_ventas,
         SUM(p.total) as ingresos_totales,
-        AVG(p.total) as ticket_promedio,
-        v.metodo_pago
+        AVG(p.total) as ticket_promedio
       FROM venta v
       INNER JOIN pedido p ON v.pedido_id_pedido = p.id_pedido
+      INNER JOIN metodo_pago mp ON v.metodo_pago_id_metodo = mp.id_metodo
       WHERE v.fecha_venta >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
-      GROUP BY DATE_FORMAT(v.fecha_venta, '%Y-%m'), v.metodo_pago
-      ORDER BY periodo DESC, v.metodo_pago
+      GROUP BY DATE_FORMAT(v.fecha_venta, '%Y-%m'), mp.nombre_metodo
+      ORDER BY periodo DESC, mp.nombre_metodo
     `);
 
+    // Consulta para análisis por métodos de pago
     const [metodosPagoData] = await pool.execute(`
       SELECT 
-        v.metodo_pago,
+        mp.nombre_metodo as metodo_pago,
         COUNT(v.id_venta) as cantidad_ventas,
         SUM(p.total) as total_ingresos,
         AVG(p.total) as promedio_venta
       FROM venta v
       INNER JOIN pedido p ON v.pedido_id_pedido = p.id_pedido
+      INNER JOIN metodo_pago mp ON v.metodo_pago_id_metodo = mp.id_metodo
       WHERE v.fecha_venta >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
-      GROUP BY v.metodo_pago
+      GROUP BY mp.nombre_metodo
       ORDER BY total_ingresos DESC
     `);
 
+    // Consulta para tendencias mensuales
     const [tendenciasData] = await pool.execute(`
       SELECT 
         MONTH(v.fecha_venta) as mes,

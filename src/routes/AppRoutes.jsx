@@ -14,6 +14,7 @@ import AdminReportes from '../pages/AdminReportes';  // Componente para reportes
 import AdminUsuarios from '../pages/AdminUsuarios'; // Componente para listar usuarios
 import AgregarProducto from '../pages/AgregarProducto';  // Componente para agregar productos
 import ListarProductos from '../pages/ListarProductos'; // componente para listar productos 
+import ReservaConfirmadaPage from '../components/ReservaConfirmadaPage';
 
 import ProtectedRoute from './ProtectedRoute';
 
@@ -55,19 +56,23 @@ const AppRoutes = () => {
           <CarritoPage />
         </ProtectedRoute>
       } />
-
+      <Route path="/reserva-confirmada" element={
+        <ProtectedRoute allowedRoles={['cliente']}>
+          <ReservaConfirmadaPage />
+        </ProtectedRoute>
+      } />
       {/* Rutas protegidas - Admin */}
       <Route path="/admin/editar/:id" element={
         <ProtectedRoute allowedRoles={['admin']}>
           <EditarProducto />
         </ProtectedRoute>
       } />
-      
+
       <Route path="/admin/GestionarPedidos" element={
         <ProtectedRoute allowedRoles={['admin']}>
-        <GestionarPedidos />
+          <GestionarPedidos />
         </ProtectedRoute>
-} />
+      } />
       <Route path="/admin/ListarProductos" element={
         <ProtectedRoute allowedRoles={['admin']}>
           <ListarProductos />
@@ -97,9 +102,9 @@ const AppRoutes = () => {
       {/* Ruta por defecto */}
       <Route path="*" element={<NotFound />} />
 
-      
+
     </Routes>
-    
+
   );
 };
 

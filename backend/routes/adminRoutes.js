@@ -28,17 +28,22 @@ import {
   crearDetalleProducto,
   actualizarEstadosProducto,
   obtenerProductoPorId,
-  listarTodosPedidos,
-  getDetallePedidoAdmin,
   cambiarEstadoPedido,
-  getEstadisticasPedidos,
   obtenerProductoParaEdicion,
   
   // NUEVOS IMPORTS PARA ESTADOS
   cambiarEstadoProducto,
   actualizarEstadosAutomaticos,
   verificarYCorregirEstados,
-  limpiarEstadosInconsistentes
+  limpiarEstadosInconsistentes,
+  getReservasActivas,
+  confirmarPagoEfectivo,
+  cancelarReserva,
+   getPedidos, 
+  getDetallePedido,
+  getEstadisticasPedidos,
+  crearReserva
+
 } from '../controllers/adminController.js';
 
 const router = express.Router();
@@ -91,6 +96,10 @@ router.post('/producto-detalle', authenticateToken, verifyAdmin, crearDetallePro
 // ============================================
 // RUTAS ADICIONALES DE PRODUCTOS
 // ============================================
+router.get('/reservas/activas', authenticateToken, verifyAdmin, getReservasActivas);
+router.put('/pedido/:pedido_id/confirmar-pago', authenticateToken, verifyAdmin, confirmarPagoEfectivo);
+router.put('/pedido/:pedido_id/cambiar-estado', authenticateToken, verifyAdmin, cambiarEstadoPedido);
+router.put('/pedido/:pedido_id/cancelar-reserva', authenticateToken, verifyAdmin, cancelarReserva);
 
 // CAMBIAR ESTA LÍNEA:
 // router.put('/producto/:id/datos-basicos', authenticateToken, verifyAdmin, actualizarDatosBasicosProducto);
@@ -115,9 +124,10 @@ router.post('/productos/limpiar-estados', authenticateToken, limpiarEstadosIncon
 // ============================================
 // RUTAS DE GESTIÓN DE PEDIDOS (ADMIN)
 // ============================================
-router.get('/pedidos/estadisticas/general', authenticateToken, verifyAdmin, getEstadisticasPedidos);
-router.get('/pedidos', authenticateToken, verifyAdmin, listarTodosPedidos);
-router.get('/pedidos/:pedido_id', authenticateToken, verifyAdmin, getDetallePedidoAdmin);
-router.put('/pedidos/:pedido_id/estado', authenticateToken, verifyAdmin, cambiarEstadoPedido);
+router.get('/estadisticas/pedidos', authenticateToken, verifyAdmin, getEstadisticasPedidos);
+router.get('/pedidos', authenticateToken, verifyAdmin, getPedidos);
+router.get('/pedidos/:pedido_id', authenticateToken, verifyAdmin, getDetallePedido);
+
+router.post('/pedido/:pedido_id/crear-reserva', authenticateToken, verifyAdmin, crearReserva)
 
 export default router;
