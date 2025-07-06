@@ -53,10 +53,19 @@ body {
   font-size: 16px;
   cursor: pointer;
   transition: background-color 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 .login-button:hover {
   background-color: #0056b3;
+}
+
+.login-button:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
 }
 
 /* Mensaje de error */
@@ -85,4 +94,316 @@ body {
 
 .register-button:hover {
   background-color: #218838;
+}
+
+.register-button:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
+/* Enlace para olvidar contraseña */
+.forgot-password-link {
+  text-align: center;
+  margin-top: 10px;
+}
+
+.forgot-password-btn {
+  background: none;
+  border: none;
+  color: #007bff;
+  font-size: 14px;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+  transition: color 0.3s;
+}
+
+.forgot-password-btn:hover {
+  color: #0056b3;
+}
+
+.forgot-password-btn:disabled {
+  color: #6c757d;
+  cursor: not-allowed;
+}
+
+/* Enlaces adicionales */
+.additional-links {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.home-link {
+  color: #007bff;
+  text-decoration: none;
+  font-size: 14px;
+  transition: color 0.3s;
+}
+
+.home-link:hover {
+  color: #0056b3;
+  text-decoration: underline;
+}
+
+/* Notificación de redirección */
+.redirect-notice {
+  background-color: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 5px;
+  padding: 10px;
+  margin-bottom: 20px;
+  text-align: center;
+  color: #856404;
+  font-size: 14px;
+}
+
+/* Estilos del modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 450px;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideIn 0.3s ease-out;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 20px 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.modal-header h3 {
+  margin: 0;
+  color: #333;
+  font-size: 18px;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #999;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.3s;
+}
+
+.modal-close:hover {
+  background-color: #f8f9fa;
+  color: #333;
+}
+
+/* Formulario de recuperación */
+.recovery-form {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.recovery-description {
+  color: #666;
+  font-size: 14px;
+  margin: 0 0 15px 0;
+  line-height: 1.4;
+}
+
+.recovery-input {
+  padding: 12px;
+  font-size: 16px;
+  border-radius: 5px;
+  border: 1px solid #ddd;
+  outline: none;
+  transition: all 0.3s;
+}
+
+.recovery-input:focus {
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.modal-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.cancel-button {
+  padding: 10px 20px;
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.3s;
+}
+
+.cancel-button:hover {
+  background-color: #5a6268;
+}
+
+.cancel-button:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
+.send-button {
+  padding: 10px 20px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.3s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.send-button:hover {
+  background-color: #0056b3;
+}
+
+.send-button:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
+/* Pantalla de éxito */
+.recovery-success {
+  padding: 30px 20px;
+  text-align: center;
+}
+
+.success-icon {
+  width: 60px;
+  height: 60px;
+  background-color: #28a745;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  font-weight: bold;
+  margin: 0 auto 20px;
+}
+
+.recovery-success h4 {
+  color: #333;
+  margin: 0 0 15px 0;
+  font-size: 18px;
+}
+
+.recovery-success p {
+  color: #666;
+  margin: 0 0 15px 0;
+  line-height: 1.4;
+}
+
+.success-note {
+  font-size: 13px;
+  color: #999;
+  font-style: italic;
+}
+
+.close-success-button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+  margin-top: 15px;
+  transition: background-color 0.3s;
+}
+
+.close-success-button:hover {
+  background-color: #0056b3;
+}
+
+/* Spinner de carga pequeño */
+.loading-spinner-small {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 1s ease-in-out infinite;
+}
+
+/* Animaciones */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Responsividad */
+@media (max-width: 480px) {
+  .modal-content {
+    width: 95%;
+    margin: 10px;
+  }
+  
+  .login-form {
+    padding: 20px;
+  }
+  
+  .modal-buttons {
+    flex-direction: column-reverse;
+  }
+  
+  .cancel-button,
+  .send-button {
+    width: 100%;
+  }
 }

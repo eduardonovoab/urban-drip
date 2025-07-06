@@ -30,6 +30,8 @@ import GestionarPedidos from '../pages/GestionarPedidos';
 
 import Contacto from '../pages/Contacto';
 
+import ResetPassword from '../components/ResetPassword';
+
 const AppRoutes = () => {
   const { user } = useContext(AuthContext); // Obtén el usuario desde el contexto
 
@@ -45,6 +47,7 @@ const AppRoutes = () => {
       <Route path="/producto/detalle/:id" element={<DetalleProducto />} />
       <Route path="/pago-resultado" element={<PagoResultado />} />
       <Route path="/payment-result" element={<Navigate to="/pago-resultado" replace />} />
+      <Route path="/reset-password/:token" element={<ResetPassword />} />
       {/* Rutas protegidas - Cliente */}
       <Route path="/cliente" element={
         <ProtectedRoute allowedRoles={['cliente']}>

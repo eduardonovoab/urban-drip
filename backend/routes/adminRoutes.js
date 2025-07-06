@@ -30,8 +30,6 @@ import {
   obtenerProductoPorId,
   cambiarEstadoPedido,
   obtenerProductoParaEdicion,
-  
-  // NUEVOS IMPORTS PARA ESTADOS
   cambiarEstadoProducto,
   actualizarEstadosAutomaticos,
   verificarYCorregirEstados,
@@ -39,10 +37,13 @@ import {
   getReservasActivas,
   confirmarPagoEfectivo,
   cancelarReserva,
-   getPedidos, 
+  getPedidos, 
   getDetallePedido,
   getEstadisticasPedidos,
-  crearReserva
+  crearReserva,
+  
+  // FUNCIONES CORREGIDAS PARA GESTIÓN DE USUARIOS
+  cambiarRolUsuario
 
 } from '../controllers/adminController.js';
 
@@ -64,6 +65,9 @@ router.get('/dashboard', authenticateToken, verifyAdmin, getAdminDashboard);
 // ============================================
 router.get('/usuarios', authenticateToken, verifyAdmin, listarUsuarios);
 router.put('/usuario/:id/estado', authenticateToken, verifyAdmin, actualizarEstadoUsuario);
+
+// 🆕 NUEVA RUTA: Cambiar rol de usuario (cliente a admin)
+router.put('/usuario/:id/rol', authenticateToken, verifyAdmin, cambiarRolUsuario);
 
 // ============================================
 // RUTAS DE PRODUCTOS
@@ -94,40 +98,38 @@ router.put('/producto-detalle/:id', authenticateToken, verifyAdmin, actualizarDe
 router.post('/producto-detalle', authenticateToken, verifyAdmin, crearDetalleProducto);
 
 // ============================================
-// RUTAS ADICIONALES DE PRODUCTOS
+// RUTAS DE GESTIÓN DE PEDIDOS Y RESERVAS
 // ============================================
 router.get('/reservas/activas', authenticateToken, verifyAdmin, getReservasActivas);
 router.put('/pedido/:pedido_id/confirmar-pago', authenticateToken, verifyAdmin, confirmarPagoEfectivo);
 router.put('/pedido/:pedido_id/cambiar-estado', authenticateToken, verifyAdmin, cambiarEstadoPedido);
 router.put('/pedido/:pedido_id/cancelar-reserva', authenticateToken, verifyAdmin, cancelarReserva);
+router.post('/pedido/:pedido_id/crear-reserva', authenticateToken, verifyAdmin, crearReserva);
 
-// CAMBIAR ESTA LÍNEA:
-// router.put('/producto/:id/datos-basicos', authenticateToken, verifyAdmin, actualizarDatosBasicosProducto);
-// POR:
-router.put('/producto/:id/datos-basicos', authenticateToken, actualizarDatosBasicosProducto);
-
+// ============================================
+// RUTAS ADICIONALES DE PRODUCTOS
+// ============================================
+router.put('/producto/:id/datos-basicos', authenticateToken, verifyAdmin, actualizarDatosBasicosProducto);
 router.post('/producto/:id/actualizar-estados', authenticateToken, verifyAdmin, actualizarEstadosProducto);
 router.get('/producto/:id/detalles', authenticateToken, verifyAdmin, obtenerProductoPorId);
 router.get('/productos/marca/:id', authenticateToken, verifyAdmin, getProductosPorMarca);
 router.get('/productos/categoria/:id', authenticateToken, verifyAdmin, listarProductosPorCategoria);
 router.get('/productos/con-detalles', authenticateToken, verifyAdmin, listarProductosConDetalles);
-router.get('/producto/:id/edicion', authenticateToken, obtenerProductoParaEdicion);
+router.get('/producto/:id/edicion', authenticateToken, verifyAdmin, obtenerProductoParaEdicion);
 
 // ============================================
-// NUEVAS RUTAS PARA GESTIÓN DE ESTADOS
+// RUTAS PARA GESTIÓN DE ESTADOS DE PRODUCTOS
 // ============================================
-router.put('/producto/:id/estado', authenticateToken, cambiarEstadoProducto);
+router.put('/producto/:id/estado', authenticateToken, verifyAdmin, cambiarEstadoProducto);
 router.post('/productos/actualizar-estados-automaticos', authenticateToken, verifyAdmin, actualizarEstadosAutomaticos);
+router.post('/productos/verificar-estados', authenticateToken, verifyAdmin, verificarYCorregirEstados);
+router.post('/productos/limpiar-estados', authenticateToken, verifyAdmin, limpiarEstadosInconsistentes);
 
-router.post('/productos/verificar-estados', authenticateToken, verificarYCorregirEstados);
-router.post('/productos/limpiar-estados', authenticateToken, limpiarEstadosInconsistentes);
 // ============================================
 // RUTAS DE GESTIÓN DE PEDIDOS (ADMIN)
 // ============================================
 router.get('/estadisticas/pedidos', authenticateToken, verifyAdmin, getEstadisticasPedidos);
 router.get('/pedidos', authenticateToken, verifyAdmin, getPedidos);
 router.get('/pedidos/:pedido_id', authenticateToken, verifyAdmin, getDetallePedido);
-
-router.post('/pedido/:pedido_id/crear-reserva', authenticateToken, verifyAdmin, crearReserva)
 
 export default router;

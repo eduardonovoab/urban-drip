@@ -521,46 +521,6 @@ export const obtenerMarcaPorId = async (req, res) => {
     res.status(500).json({ error: 'Error al obtener marca' });
   }
 };
-
-// Listar usuarios
-export const listarUsuarios = async (req, res) => {
-  try {
-    const [usuarios] = await pool.query(
-      'SELECT id_usuario, nombre_usuario, apellido_usuario, correo, rol, estado_usuario FROM usuario ORDER BY id_usuario'
-    );
-    res.json(usuarios);
-  } catch (error) {
-    console.error('❌ Error al cargar usuarios:', error);
-    res.status(500).json({ error: 'Error al cargar usuarios' });
-  }
-};
-
-// Actualizar estado del usuario
-export const actualizarEstadoUsuario = async (req, res) => {
-  const { id } = req.params;
-  const { estado } = req.body;
-
-  if (estado !== 'activo' && estado !== 'inactivo') {
-    return res.status(400).json({ message: 'El estado debe ser "activo" o "inactivo"' });
-  }
-
-  try {
-    const [result] = await pool.query(
-      'UPDATE usuario SET estado_usuario = ? WHERE id_usuario = ?',
-      [estado, id]
-    );
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'Usuario no encontrado' });
-    }
-
-    res.status(200).json({ message: `El estado del usuario ha sido actualizado a ${estado}` });
-  } catch (error) {
-    console.error('❌ Error al cambiar el estado del usuario:', error);
-    res.status(500).json({ message: 'Error interno del servidor' });
-  }
-};
-
 export const getProductoDetallePorId = async (req, res) => {
   const { id } = req.params;
 
@@ -3317,6 +3277,295 @@ export const crearReserva = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error al crear la reserva'
+    });
+  } finally {
+    connection.release();
+  }
+};
+// AGREGAR ESTA FUNCIÓN AL FINAL DE TU adminController.js
+// REEMPLAZA la función cambiarRolUsuario existente
+
+/**
+ * FUNCIONALIDAD: Cambiar rol de usuario (cliente a admin)
+ * PUT /api/admin/usuario/:id/rol
+ */
+export const cambiarRolUsuario = async (req, res) => {
+  const connection = await pool.getConnection();
+
+  try {
+    const { id } = req.params;
+    const { nuevoRol } = req.body;
+
+    console.log(`👑 Cambiando rol del usuario ${id} a: ${nuevoRol}`);
+
+    // Validar que el nuevo rol sea válido
+    if (!['admin', 'cliente'].includes(nuevoRol)) {
+      return res.status(400).json({
+        message: 'Rol inválido. Debe ser "admin" o "cliente"'
+      });
+    }
+
+    await connection.beginTransaction();
+
+    // Verificar que el usuario objetivo existe y obtener su información actual
+    const [usuarioActual] = await connection.execute(
+      `SELECT 
+        id_usuario, 
+        nombre_usuario, 
+        apellido_usuario, 
+        correo, 
+        rol, 
+        estado_usuario 
+      FROM usuario 
+      WHERE id_usuario = ?`,
+      [id]
+    );
+
+    if (usuarioActual.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({
+        message: 'Usuario no encontrado'
+      });
+    }
+
+    const usuario = usuarioActual[0];
+
+    // Verificar que el usuario esté activo
+    if (usuario.estado_usuario !== 'activo') {
+      await connection.rollback();
+      return res.status(400).json({
+        message: 'No se puede cambiar el rol de un usuario inactivo. Actívalo primero.'
+      });
+    }
+
+    // Verificar que no es el mismo rol actual
+    if (usuario.rol === nuevoRol) {
+      await connection.rollback();
+      return res.status(400).json({
+        message: `El usuario ya tiene el rol de ${nuevoRol}`
+      });
+    }
+
+    // Solo permitir cambiar de cliente a admin (por seguridad)
+    if (usuario.rol !== 'cliente' || nuevoRol !== 'admin') {
+      await connection.rollback();
+      return res.status(400).json({
+        message: 'Solo se permite cambiar usuarios con rol "cliente" a "admin"'
+      });
+    }
+
+    // Realizar el cambio de rol
+    const [updateResult] = await connection.execute(
+      'UPDATE usuario SET rol = ? WHERE id_usuario = ?',
+      [nuevoRol, id]
+    );
+
+    if (updateResult.affectedRows === 0) {
+      await connection.rollback();
+      return res.status(500).json({
+        message: 'No se pudo actualizar el rol del usuario'
+      });
+    }
+
+    // Opcional: Crear log de auditoría si tienes tabla para ello
+    try {
+      await connection.execute(
+        `INSERT INTO logs_cambios_rol 
+        (usuario_modificado_id, rol_anterior, rol_nuevo, admin_id, fecha_cambio, descripcion) 
+        VALUES (?, ?, ?, ?, NOW(), ?)`,
+        [
+          id, 
+          usuario.rol, 
+          nuevoRol, 
+          req.user?.id_usuario || 1, // ID del admin que hace el cambio
+          `Cambio de rol de ${usuario.rol} a ${nuevoRol} - ${usuario.nombre_usuario} ${usuario.apellido_usuario}`
+        ]
+      );
+    } catch (logError) {
+      console.warn('⚠️ No se pudo guardar el log de auditoría:', logError.message);
+      // No fallar por esto
+    }
+
+    await connection.commit();
+
+    // Log de auditoría en consola
+    console.log(`✅ Rol cambiado exitosamente:`, {
+      usuario_modificado: {
+        id: usuario.id_usuario,
+        nombre: `${usuario.nombre_usuario} ${usuario.apellido_usuario}`,
+        correo: usuario.correo
+      },
+      rol_anterior: usuario.rol,
+      rol_nuevo: nuevoRol,
+      timestamp: new Date().toISOString()
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `¡Éxito! ${usuario.nombre_usuario} ${usuario.apellido_usuario} ahora es ${nuevoRol}`,
+      usuario: {
+        id: usuario.id_usuario,
+        nombre: `${usuario.nombre_usuario} ${usuario.apellido_usuario}`,
+        correo: usuario.correo,
+        rol_anterior: usuario.rol,
+        rol_nuevo: nuevoRol,
+        estado: usuario.estado_usuario
+      },
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    await connection.rollback();
+    console.error('❌ Error al cambiar rol del usuario:', error);
+    
+    if (error.code === 'ER_NO_REFERENCED_ROW_2') {
+      return res.status(400).json({
+        message: 'Error de referencia en la base de datos'
+      });
+    }
+
+    res.status(500).json({
+      message: 'Error interno del servidor al cambiar rol del usuario',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  } finally {
+    connection.release();
+  }
+};
+
+/**
+ * FUNCIONALIDAD: Listar usuarios - CORREGIDA para mostrar roles correctamente
+ * GET /api/admin/usuarios
+ */
+export const listarUsuarios = async (req, res) => {
+  try {
+    console.log('🔍 Obteniendo lista de usuarios...');
+    
+    const [usuarios] = await pool.query(`
+      SELECT 
+        id_usuario, 
+        nombre_usuario, 
+        apellido_usuario, 
+        correo, 
+        rol, 
+        estado_usuario,
+        rut,
+        direccion
+      FROM usuario 
+    `);
+    
+    console.log(`✅ ${usuarios.length} usuarios encontrados`);
+    
+    // Agregar estadísticas por rol
+    const stats = {
+      total: usuarios.length,
+      admins: usuarios.filter(u => u.rol === 'admin').length,
+      clientes: usuarios.filter(u => u.rol === 'cliente').length,
+      activos: usuarios.filter(u => u.estado_usuario === 'activo').length,
+      inactivos: usuarios.filter(u => u.estado_usuario === 'inactivo').length
+    };
+    
+    res.json({
+      success: true,
+      usuarios: usuarios,
+      estadisticas: stats
+    });
+  } catch (error) {
+    console.error('❌ Error al cargar usuarios:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Error al cargar usuarios' 
+    });
+  }
+};
+
+/**
+ * FUNCIONALIDAD: Actualizar estado del usuario - CORREGIDA
+ * PUT /api/admin/usuario/:id/estado
+ */
+export const actualizarEstadoUsuario = async (req, res) => {
+  const connection = await pool.getConnection();
+
+  try {
+    const { id } = req.params;
+    const { estado } = req.body;
+
+    console.log(`🔄 Cambiando estado del usuario ${id} a: ${estado}`);
+
+    if (!['activo', 'inactivo'].includes(estado)) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'El estado debe ser "activo" o "inactivo"' 
+      });
+    }
+
+    await connection.beginTransaction();
+
+    // Verificar que el usuario existe y obtener su info
+    const [usuarioActual] = await connection.execute(
+      'SELECT id_usuario, rol, estado_usuario, nombre_usuario, apellido_usuario FROM usuario WHERE id_usuario = ?',
+      [id]
+    );
+
+    if (usuarioActual.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ 
+        success: false,
+        message: 'Usuario no encontrado' 
+      });
+    }
+
+    const usuario = usuarioActual[0];
+
+    // No permitir cambiar estado de administradores a inactivo
+    if (usuario.rol === 'admin' && estado === 'inactivo') {
+      await connection.rollback();
+      return res.status(403).json({
+        success: false,
+        message: 'No se puede desactivar un administrador'
+      });
+    }
+
+    // Verificar que no es el mismo estado
+    if (usuario.estado_usuario === estado) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        message: `El usuario ya está ${estado}`
+      });
+    }
+
+    // Actualizar estado
+    const [result] = await connection.execute(
+      'UPDATE usuario SET estado_usuario = ? WHERE id_usuario = ?',
+      [estado, id]
+    );
+
+    if (result.affectedRows === 0) {
+      await connection.rollback();
+      return res.status(500).json({ 
+        success: false,
+        message: 'No se pudo actualizar el estado' 
+      });
+    }
+
+    await connection.commit();
+
+    console.log(`✅ Estado del usuario ${id} cambiado a ${estado}`);
+
+    res.status(200).json({ 
+      success: true,
+      message: `Usuario ${usuario.nombre_usuario} ${usuario.apellido_usuario} ${estado === 'activo' ? 'activado' : 'desactivado'} correctamente`,
+      usuario_id: id,
+      nuevo_estado: estado
+    });
+
+  } catch (error) {
+    await connection.rollback();
+    console.error('❌ Error al cambiar el estado del usuario:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Error interno del servidor' 
     });
   } finally {
     connection.release();
