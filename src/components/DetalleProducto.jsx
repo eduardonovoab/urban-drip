@@ -1,14 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
-import { Heart, Share2, Truck, Shield, RotateCcw, Star, AlertTriangle } from 'lucide-react';
+import { Heart, Share2, Truck, Shield, RotateCcw, Star, AlertTriangle, Crown, Eye } from 'lucide-react';
 import { useCarrito } from '../context/CarritoContext';
 import { toast } from 'react-toastify';
 import '../styles/DetalleProducto.css';
 
 const DetalleProducto = () => {
   const { id } = useParams();
-  const { agregarAlCarrito, carrito, estaEnCarrito, getCantidadProducto } = useCarrito();
+  const { 
+    agregarAlCarrito, 
+    carrito, 
+    estaEnCarrito, 
+    getCantidadProducto,
+    isAdmin,
+    userRole,
+    usuario,
+    userChecked,
+    verificarAdminDesdeToken
+  } = useCarrito();
   
   const [producto, setProducto] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -65,9 +75,6 @@ const DetalleProducto = () => {
 
     const stockTotal = producto.detalles.reduce((total, detalle) => total + (detalle.stock || 0), 0);
     
-    // Verificar si el producto está inhabilitado (esto debería venir del backend)
-    // Por ahora, asumimos que si llega aquí, está activo
-    
     if (stockTotal === 0) {
       return { tipo: 'agotado', nombre: 'Agotado' };
     }
@@ -86,7 +93,40 @@ const DetalleProducto = () => {
     setQuantity(1); // Reset quantity when changing size
   };
 
+  // 🔥 NUEVA: Función mejorada para agregar al carrito con verificación de admin ROBUSTA
   const handleAddToCart = async () => {
+    console.log('🛒 handleAddToCart ejecutado');
+    console.log('🔍 Estado admin - isAdmin:', isAdmin, 'userRole:', userRole, 'userChecked:', userChecked);
+
+    // 🔥 VERIFICACIÓN INMEDIATA desde el token
+    const esAdminToken = verificarAdminDesdeToken();
+    console.log('🔍 Verificación directa desde token en component - Es admin:', esAdminToken);
+
+    // 🔥 VERIFICACIÓN ROBUSTA: Multiple verificaciones de admin
+    const esAdmin = esAdminToken || 
+                    isAdmin || 
+                    userRole?.toLowerCase() === 'admin' || 
+                    userRole?.toLowerCase() === 'administrador' ||
+                    usuario?.rol?.toLowerCase() === 'admin' ||
+                    usuario?.rol?.toLowerCase() === 'administrador';
+
+    if (esAdmin) {
+      toast.error('No puedes agregar al carrito siendo admin', {
+        autoClose: 4000
+      });
+      console.warn('🚫 Bloqueado en handleAddToCart: Usuario es admin');
+      return;
+    }
+
+    // 🔥 VERIFICACIÓN ADICIONAL: Si el usuario no ha sido verificado completamente
+    if (!userChecked) {
+      console.log('⏳ Usuario no verificado, esperando...');
+      toast.info('Verificando permisos de usuario...', {
+        autoClose: 2000
+      });
+      return;
+    }
+
     if (!selectedDetalle) {
       toast.error('Por favor selecciona una talla');
       return;
@@ -100,9 +140,25 @@ const DetalleProducto = () => {
     setAgregandoCarrito(true);
     
     try {
+      console.log('✅ Procediendo con agregarAlCarrito...');
       const result = await agregarAlCarrito(selectedDetalle.id_detalle_producto, quantity);
+      
+      console.log('📦 Resultado agregarAlCarrito:', result);
+      
+      // Verificar si fue bloqueado por ser admin
+      if (result.isAdminBlocked) {
+        console.log('🚫 Operación bloqueada: Usuario administrador');
+        // No mostrar error adicional, ya se mostró en agregarAlCarrito
+        return;
+      }
+
+      // Si hay un error pero no es por admin, mostrarlo
+      if (!result.success && !result.isAdminBlocked) {
+        toast.error(result.message || 'Error al agregar el producto al carrito');
+      }
+
     } catch (error) {
-      console.error('Error al agregar al carrito:', error);
+      console.error('❌ Error en handleAddToCart:', error);
       toast.error('Error al agregar el producto al carrito');
     } finally {
       setAgregandoCarrito(false);
@@ -140,6 +196,12 @@ const DetalleProducto = () => {
   const isProductInCart = selectedDetalle ? estaEnCarrito(selectedDetalle.id_detalle_producto) : false;
   const cantidadEnCarrito = selectedDetalle ? getCantidadProducto(selectedDetalle.id_detalle_producto) : 0;
   const stockTotal = producto?.detalles?.reduce((total, detalle) => total + (detalle.stock || 0), 0) || 0;
+
+  // 🔥 VERIFICACIÓN ADICIONAL: Determinar si es admin usando múltiples métodos
+  const esAdminActual = verificarAdminDesdeToken() || 
+                       isAdmin || 
+                       userRole?.toLowerCase() === 'admin' || 
+                       userRole?.toLowerCase() === 'administrador';
 
   if (loading) {
     return (
@@ -181,7 +243,18 @@ const DetalleProducto = () => {
   const tallasDisponibles = getTallasUnicas();
 
   return (
-    <div className={`detalle-producto-page ${estadoProducto.tipo === 'agotado' ? 'producto-agotado' : ''}`}>
+    <div className={`detalle-producto-page ${estadoProducto.tipo === 'agotado' ? 'producto-agotado' : ''} ${esAdminActual ? 'vista-admin' : ''}`}>
+      {/* 🔥 NUEVA: Alerta para administradores */}
+      {esAdminActual && (
+        <div className="alerta-admin">
+          <Crown className="alerta-icon admin-icon" />
+          <div className="alerta-content">
+            <h4>Vista de Administrador</h4>
+            <p>Estás viendo este producto como administrador. No puedes agregar productos al carrito.</p>
+          </div>
+        </div>
+      )}
+
       {/* Breadcrumb */}
       <div className="breadcrumb-container">
         <nav className="breadcrumb">
@@ -246,6 +319,14 @@ const DetalleProducto = () => {
                   <span>¡ÚLTIMAS UNIDADES!</span>
                 </div>
               )}
+
+              {/* 🔥 NUEVO: Badge de vista admin */}
+              {esAdminActual && (
+                <div className="badge-estado admin-badge">
+                  <Crown className="badge-icon" />
+                  <span>VISTA ADMIN</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -256,6 +337,7 @@ const DetalleProducto = () => {
             <div className="producto-header">
               <h1 className="producto-titulo">
                 {producto.nombre_producto}
+                {esAdminActual && <Crown className="admin-crown-title" />}
               </h1>
               
               {/* Estado y precio */}
@@ -297,7 +379,7 @@ const DetalleProducto = () => {
               <p>{producto.descripcion}</p>
             </div>
 
-            {/* Selector de talla MEJORADO */}
+            {/* Selector de talla */}
             <div className="talla-selector-section">
               <div className="talla-header">
                 <label className="talla-label">
@@ -354,7 +436,7 @@ const DetalleProducto = () => {
                       </>
                     )}
                   </p>
-                  {isProductInCart && (
+                  {isProductInCart && !esAdminActual && (
                     <p className="carrito-info">
                       Ya tienes <span className="cantidad-carrito">{cantidadEnCarrito}</span> en tu carrito
                     </p>
@@ -363,8 +445,8 @@ const DetalleProducto = () => {
               )}
             </div>
 
-            {/* Cantidad - Solo mostrar si hay stock */}
-            {selectedDetalle && selectedDetalle.stock > 0 && (
+            {/* Cantidad - Solo mostrar si hay stock y NO es admin */}
+            {selectedDetalle && selectedDetalle.stock > 0 && !esAdminActual && (
               <div className="cantidad-section">
                 <label className="cantidad-label">Cantidad</label>
                 <div className="cantidad-controls">
@@ -392,10 +474,43 @@ const DetalleProducto = () => {
               </div>
             )}
 
-            {/* Botones de acción MEJORADOS */}
+            {/* 🔥 MEJORADA: Botones de acción con lógica para administradores */}
             <div className="acciones-section">
-              {estadoProducto.tipo === 'agotado' ? (
-                // Botones para producto agotado
+              {esAdminActual ? (
+                // 🔥 NUEVA: Vista especial para administradores
+                <div className="acciones-admin">
+                  <div className="admin-info-box">
+                    <Crown className="admin-info-icon" />
+                    <div className="admin-info-content">
+                      <h4>Vista de Administrador</h4>
+                      <p>Como administrador, puedes visualizar todos los detalles del producto, pero no puedes agregar al carrito.</p>
+                    </div>
+                  </div>
+                  
+                  <div className="admin-actions">
+                   
+                   
+                   
+                   
+                    
+                    <div className="secondary-actions">
+                      <button
+                        onClick={() => setIsFavorite(!isFavorite)}
+                        className={`secondary-btn ${isFavorite ? 'favorite-active' : ''}`}
+                      >
+                        <Heart className={`action-icon ${isFavorite ? 'heart-filled' : ''}`} />
+                        <span>Favoritos</span>
+                      </button>
+                      
+                      <button className="secondary-btn">
+                        <Share2 className="action-icon" />
+                        <span>Compartir</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : estadoProducto.tipo === 'agotado' ? (
+                // Botones para producto agotado (clientes)
                 <div className="acciones-agotado">
                   <button className="btn-notificar">
                     <Heart className="action-icon" />
@@ -417,7 +532,7 @@ const DetalleProducto = () => {
                   </div>
                 </div>
               ) : (
-                // Botones para producto disponible
+                // Botones para producto disponible (clientes)
                 <>
                   <button
                     onClick={handleAddToCart}
@@ -460,28 +575,40 @@ const DetalleProducto = () => {
 
             {/* Información adicional */}
             <div className="info-adicional">
-              <div className="info-item">
-                <Truck className="info-icon" />
-                <span>
-                  {estadoProducto.tipo === 'agotado' 
-                    ? 'Envío gratis cuando esté disponible' 
-                    : 'Envío gratis en pedidos superiores a $50.000'
-                  }
-                </span>
-              </div>
-              <div className="info-item">
-                <RotateCcw className="info-icon" />
-                <span>Devoluciones gratuitas hasta 30 días</span>
-              </div>
-              <div className="info-item">
-                <Shield className="info-icon" />
-                <span>Compra 100% segura</span>
-              </div>
-              
-              {estadoProducto.tipo === 'agotado' && (
-                <div className="info-item info-agotado">
-                  <AlertTriangle className="info-icon" />
-                  <span>Te notificaremos por email cuando esté disponible</span>
+              {!esAdminActual && (
+                <>
+                  <div className="info-item">
+                    <Truck className="info-icon" />
+                    <span>
+                      {estadoProducto.tipo === 'agotado' 
+                        ? 'Envío gratis cuando esté disponible' 
+                        : 'Envío gratis en pedidos superiores a $50.000'
+                      }
+                    </span>
+                  </div>
+                  <div className="info-item">
+                    <RotateCcw className="info-icon" />
+                    <span>Devoluciones gratuitas hasta 30 días</span>
+                  </div>
+                  <div className="info-item">
+                    <Shield className="info-icon" />
+                    <span>Compra 100% segura</span>
+                  </div>
+                  
+                  {estadoProducto.tipo === 'agotado' && (
+                    <div className="info-item info-agotado">
+                      <AlertTriangle className="info-icon" />
+                      <span>Te notificaremos por email cuando esté disponible</span>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* 🔥 NUEVA: Información especial para administradores */}
+              {esAdminActual && (
+                <div className="info-item info-admin">
+                  <Crown className="info-icon" />
+                  <span>Vista de administrador - No puedes agregar al carrito</span>
                 </div>
               )}
             </div>
@@ -496,6 +623,9 @@ const DetalleProducto = () => {
                   <p><span className="detalle-label">Categoría:</span> {producto.categoria.nombre_categoria}</p>
                 )}
                 <p><span className="detalle-label">Estado:</span> {estadoProducto.nombre}</p>
+                {esAdminActual && (
+                  <p><span className="detalle-label">Rol:</span> Administrador</p>
+                )}
               </div>
             )}
           </div>

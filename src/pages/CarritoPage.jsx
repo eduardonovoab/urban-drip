@@ -1,4 +1,4 @@
-// components/CarritoPage.jsx - VERSIÓN COMBINADA CON SISTEMA DE ESTADOS Y PAGO EN EFECTIVO
+// components/CarritoPage.jsx - VERSIÓN CON ALERTAS MODERNAS
 import React, { useState, useEffect } from 'react';
 import { useCarrito } from '../context/CarritoContext';
 import { useNavigate } from 'react-router-dom';
@@ -22,13 +22,26 @@ const CarritoPage = () => {
     fetchCarrito,
     calcularTotal,
     cantidadTotal,
-    finalizarCompra // Nueva función del contexto
+    finalizarCompra
   } = carritoContext;
 
   const navigate = useNavigate();
   const [procesandoCompra, setProcesandoCompra] = useState(false);
   const [mostrarModalPago, setMostrarModalPago] = useState(false);
   const [metodoPagoSeleccionado, setMetodoPagoSeleccionado] = useState('');
+
+  // 🆕 Estados para modales de confirmación modernos
+  const [modalConfirmacion, setModalConfirmacion] = useState({
+    mostrar: false,
+    tipo: '',
+    titulo: '',
+    mensaje: '',
+    textoConfirmar: '',
+    textoCancel: 'Cancelar',
+    onConfirmar: null,
+    icono: '',
+    colorConfirmar: '#dc3545'
+  });
 
   const isLoading = loading || carritoLoading;
   const isInitialized = initialized;
@@ -55,6 +68,37 @@ const CarritoPage = () => {
     }
   }, [isInitialized, fetchCarrito, isLoading]);
 
+  // 🆕 Función para mostrar modal de confirmación moderno
+  const mostrarConfirmacion = (config) => {
+    setModalConfirmacion({
+      mostrar: true,
+      ...config
+    });
+  };
+
+  // 🆕 Función para cerrar modal de confirmación
+  const cerrarConfirmacion = () => {
+    setModalConfirmacion({
+      mostrar: false,
+      tipo: '',
+      titulo: '',
+      mensaje: '',
+      textoConfirmar: '',
+      textoCancel: 'Cancelar',
+      onConfirmar: null,
+      icono: '',
+      colorConfirmar: '#dc3545'
+    });
+  };
+
+  // 🆕 Función para ejecutar confirmación
+  const ejecutarConfirmacion = () => {
+    if (modalConfirmacion.onConfirmar) {
+      modalConfirmacion.onConfirmar();
+    }
+    cerrarConfirmacion();
+  };
+
   const handleCantidadChange = async (detalle_id, nuevaCantidad) => {
     if (nuevaCantidad <= 0) return;
 
@@ -62,42 +106,97 @@ const CarritoPage = () => {
       const result = await actualizarCantidad(detalle_id, nuevaCantidad);
       if (!result.success) {
         console.error('Error al actualizar cantidad:', result.message);
-        toast.error(result.message || 'Error al actualizar cantidad');
+        toast.error(`❌ No se pudo actualizar la cantidad: ${result.message}`, {
+          position: "top-right",
+          autoClose: 4000
+        });
+      } else {
+        toast.success(`✅ Cantidad actualizada correctamente`, {
+          position: "top-right",
+          autoClose: 2000
+        });
       }
     } catch (error) {
       console.error('Error al actualizar cantidad:', error);
-      toast.error('Error al actualizar cantidad');
+      toast.error('❌ Error de conexión al actualizar la cantidad', {
+        position: "top-right",
+        autoClose: 4000
+      });
     }
   };
 
-  const handleEliminar = async (detalle_producto_id) => {
-    if (window.confirm('¿Estás seguro de que quieres eliminar este producto del carrito?')) {
-      try {
-        const result = await eliminarDelCarrito(detalle_producto_id);
-        if (!result.success) {
-          console.error('Error al eliminar producto:', result.message);
-          toast.error(result.message || 'Error al eliminar producto');
+  // 🔄 Función mejorada para eliminar producto con modal moderno
+  const handleEliminar = async (detalle_producto_id, nombreProducto = 'este producto') => {
+    mostrarConfirmacion({
+      tipo: 'eliminar',
+      titulo: '🗑️ Eliminar Producto',
+      mensaje: `¿Estás seguro de que quieres eliminar "${nombreProducto}" del carrito?`,
+      textoConfirmar: 'Sí, eliminar',
+      textoCancel: 'Conservar',
+      icono: '🗑️',
+      colorConfirmar: '#dc3545',
+      onConfirmar: async () => {
+        try {
+          const result = await eliminarDelCarrito(detalle_producto_id);
+          if (!result.success) {
+            console.error('Error al eliminar producto:', result.message);
+            toast.error(`❌ No se pudo eliminar el producto: ${result.message}`, {
+              position: "top-right",
+              autoClose: 4000
+            });
+          } else {
+            toast.success(`🗑️ "${nombreProducto}" eliminado del carrito`, {
+              position: "top-right",
+              autoClose: 3000
+            });
+          }
+        } catch (error) {
+          console.error('Error al eliminar producto:', error);
+          toast.error('❌ Error de conexión al eliminar el producto', {
+            position: "top-right",
+            autoClose: 4000
+          });
         }
-      } catch (error) {
-        console.error('Error al eliminar producto:', error);
-        toast.error('Error al eliminar producto');
       }
-    }
+    });
   };
 
+  // 🔄 Función mejorada para limpiar carrito con modal moderno
   const handleLimpiarCarrito = async () => {
-    if (window.confirm('¿Estás seguro de que quieres vaciar el carrito?')) {
-      try {
-        const result = await limpiarCarrito();
-        if (!result.success) {
-          console.error('Error al vaciar carrito:', result.message);
-          toast.error(result.message || 'Error al vaciar carrito');
+    const cantidadItems = carritoData.items?.length || 0;
+    
+    mostrarConfirmacion({
+      tipo: 'limpiar',
+      titulo: '🧹 Vaciar Carrito Completo',
+      mensaje: `¿Estás seguro de que quieres eliminar todos los ${cantidadItems} productos de tu carrito? Esta acción no se puede deshacer.`,
+      textoConfirmar: 'Sí, vaciar todo',
+      textoCancel: 'Conservar productos',
+      icono: '🧹',
+      colorConfirmar: '#dc3545',
+      onConfirmar: async () => {
+        try {
+          const result = await limpiarCarrito();
+          if (!result.success) {
+            console.error('Error al vaciar carrito:', result.message);
+            toast.error(`❌ No se pudo vaciar el carrito: ${result.message}`, {
+              position: "top-right",
+              autoClose: 4000
+            });
+          } else {
+            toast.success(`🧹 Carrito vaciado correctamente (${cantidadItems} productos eliminados)`, {
+              position: "top-right",
+              autoClose: 3000
+            });
+          }
+        } catch (error) {
+          console.error('Error al vaciar carrito:', error);
+          toast.error('❌ Error de conexión al vaciar el carrito', {
+            position: "top-right",
+            autoClose: 4000
+          });
         }
-      } catch (error) {
-        console.error('Error al vaciar carrito:', error);
-        toast.error('Error al vaciar carrito');
       }
-    }
+    });
   };
 
   // Función mejorada para generar identificadores únicos
@@ -119,25 +218,21 @@ const CarritoPage = () => {
     console.log('URL:', url);
     console.log('Token:', token);
 
-    // Crear formulario dinámicamente
     const form = document.createElement('form');
     form.method = 'POST';
     form.action = url;
 
-    // Agregar token como campo oculto
     const tokenInput = document.createElement('input');
     tokenInput.type = 'hidden';
     tokenInput.name = 'token_ws';
     tokenInput.value = token;
     form.appendChild(tokenInput);
 
-    // Agregar formulario al body y enviarlo
     document.body.appendChild(form);
     
     console.log('Enviando formulario POST a Transbank...');
     form.submit();
     
-    // Limpiar el formulario después de enviarlo
     setTimeout(() => {
       document.body.removeChild(form);
     }, 1000);
@@ -145,18 +240,22 @@ const CarritoPage = () => {
 
   // 🎯 FUNCIÓN COMBINADA: Mostrar modal de selección de pago
   const handleProcederAlPago = () => {
-    // Validaciones iniciales
     if (!carritoData.items || carritoData.items.length === 0) {
-      toast.error('Tu carrito está vacío');
+      toast.error('🛒 Tu carrito está vacío. Agrega productos antes de continuar.', {
+        position: "top-center",
+        autoClose: 4000
+      });
       return;
     }
 
     if (!carritoData.total || carritoData.total <= 0) {
-      toast.error('El total del carrito debe ser mayor a $0');
+      toast.error('💰 El total del carrito debe ser mayor a $0', {
+        position: "top-center",
+        autoClose: 4000
+      });
       return;
     }
 
-    // Mostrar modal de opciones de pago
     setMostrarModalPago(true);
     setMetodoPagoSeleccionado('');
   };
@@ -164,7 +263,10 @@ const CarritoPage = () => {
   // 🎯 FUNCIÓN COMBINADA: Procesar pago unificado
   const procesarPago = async () => {
     if (!metodoPagoSeleccionado) {
-      toast.error('Por favor selecciona un método de pago');
+      toast.error('💳 Por favor selecciona un método de pago', {
+        position: "top-center",
+        autoClose: 3000
+      });
       return;
     }
 
@@ -182,7 +284,10 @@ const CarritoPage = () => {
       
     } catch (error) {
       console.error('Error al procesar pago:', error);
-      toast.error(error.message || 'Error al procesar el pago');
+      toast.error(`❌ Error al procesar el pago: ${error.message}`, {
+        position: "top-center",
+        autoClose: 5000
+      });
     } finally {
       setProcesandoCompra(false);
     }
@@ -194,7 +299,11 @@ const CarritoPage = () => {
       console.log('=== INICIANDO PROCESO DE RESERVA (PAGO EN EFECTIVO) ===');
       console.log('Carrito data:', carritoData);
 
-      // PASO 1: Finalizar carrito con método "Efectivo" (creará pedido en estado "Reservado")
+      toast.info('📝 Creando tu reserva...', {
+        position: "top-center",
+        autoClose: 2000
+      });
+
       console.log('🛒 PASO 1: Creando reserva del pedido...');
       
       const resultFinalizar = await finalizarCompra('Efectivo');
@@ -207,7 +316,6 @@ const CarritoPage = () => {
       const codigoReserva = resultFinalizar.codigo_reserva || `RES-${pedidoId}`;
       console.log('✅ Pedido reservado. ID:', pedidoId);
 
-      // Guardar información de la reserva
       const reservaInfo = {
         pedido_id: pedidoId,
         codigo_reserva: codigoReserva,
@@ -221,20 +329,18 @@ const CarritoPage = () => {
           subtotal: item.subtotal || (item.precio * item.cantidad)
         })),
         fecha_reserva: new Date().toISOString(),
-        fecha_expiracion: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString() // 48 horas
+        fecha_expiracion: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()
       };
 
       localStorage.setItem('reservaInfo', JSON.stringify(reservaInfo));
 
-      // Mostrar mensaje de éxito
-      toast.success('¡Pedido reservado exitosamente!', {
-        autoClose: 3000
+      toast.success('🎉 ¡Pedido reservado exitosamente! Tienes 48 horas para retirarlo en tienda.', {
+        position: "top-center",
+        autoClose: 4000
       });
 
-      // Cerrar modal
       setMostrarModalPago(false);
 
-      // Redirigir a página de confirmación de reserva
       setTimeout(() => {
         navigate('/reserva-confirmada', { 
           state: { 
@@ -250,7 +356,8 @@ const CarritoPage = () => {
       console.error('=== ERROR EN PROCESO DE RESERVA ===');
       console.error('Error:', error);
       
-      toast.error(error.message || 'Error al procesar la reserva', {
+      toast.error(`❌ Error al procesar la reserva: ${error.message}`, {
+        position: "top-center",
         autoClose: 5000
       });
       
@@ -270,7 +377,11 @@ const CarritoPage = () => {
       console.log('=== INICIANDO PROCESO DE COMPRA CON WEBPAY ===');
       console.log('Carrito data:', carritoData);
 
-      // PASO 1: Finalizar carrito (crear pedido en estado "Pendiente")
+      toast.info('💳 Preparando pago con Webpay...', {
+        position: "top-center",
+        autoClose: 2000
+      });
+
       console.log('🛒 PASO 1: Finalizando carrito...');
       
       const resultFinalizar = await finalizarCompra('Webpay');
@@ -282,10 +393,8 @@ const CarritoPage = () => {
       const pedidoId = resultFinalizar.pedido_id;
       console.log('✅ Carrito finalizado. Pedido ID:', pedidoId);
 
-      // PASO 2: Preparar datos para Webpay
       console.log('💳 PASO 2: Preparando pago con Webpay...');
       
-      // Generar identificadores únicos
       const buyOrder = generarBuyOrder();
       const sessionId = generarSessionId();
       const returnUrl = `${window.location.origin}/pago-resultado`;
@@ -296,7 +405,6 @@ const CarritoPage = () => {
       console.log('Return URL:', returnUrl);
       console.log('Pedido ID:', pedidoId);
 
-      // Guardar información para después del pago
       const purchaseInfo = {
         pedido_id: pedidoId,
         buyOrder,
@@ -313,7 +421,6 @@ const CarritoPage = () => {
 
       localStorage.setItem('purchaseInfo', JSON.stringify(purchaseInfo));
 
-      // Datos para enviar a Webpay
       const transactionData = {
         amount: Math.round(carritoData.total),
         buyOrder: buyOrder,
@@ -325,7 +432,6 @@ const CarritoPage = () => {
       console.log('=== ENVIANDO A WEBPAY ===');
       console.log('Transaction Data:', transactionData);
 
-      // PASO 3: Crear transacción en Webpay
       const response = await fetch('http://localhost:3000/api/webpay/crear', {
         method: 'POST',
         headers: {
@@ -340,7 +446,6 @@ const CarritoPage = () => {
       console.log('Status:', response.status);
       console.log('OK:', response.ok);
 
-      // Manejar respuesta
       let data;
       const contentType = response.headers.get('content-type');
       
@@ -373,7 +478,6 @@ const CarritoPage = () => {
         throw new Error(errorMessage);
       }
 
-      // Validar respuesta exitosa
       if (!data.success || !data.url || !data.token) {
         console.error('=== RESPUESTA INCOMPLETA DE WEBPAY ===');
         console.error('Success:', data.success);
@@ -387,7 +491,6 @@ const CarritoPage = () => {
       console.log('URL de Transbank:', data.url);
       console.log('Token:', data.token);
 
-      // Validar URL
       try {
         new URL(data.url);
       } catch (urlError) {
@@ -395,20 +498,16 @@ const CarritoPage = () => {
         throw new Error('URL de pago inválida recibida del servidor');
       }
 
-      // Guardar token de Transbank
       localStorage.setItem('transbankToken', data.token);
-
-      // Cerrar modal
       setMostrarModalPago(false);
 
-      // PASO 4: Redirigir a Transbank
-      toast.success('Pedido creado correctamente. Redirigiendo a Transbank...', {
-        autoClose: 2000
+      toast.success('🚀 Pedido creado correctamente. Redirigiendo a Transbank para el pago...', {
+        position: "top-center",
+        autoClose: 3000
       });
 
       console.log('=== ENVIANDO FORMULARIO POST A TRANSBANK ===');
       
-      // Pausa para mostrar mensaje
       setTimeout(() => {
         enviarFormularioTransbank(data.url, data.token);
       }, 1500);
@@ -419,13 +518,12 @@ const CarritoPage = () => {
       console.error('Error name:', error.name);
       console.error('Error message:', error.message);
       
-      // Mensajes de error más específicos
       let errorMessage;
       
       if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        errorMessage = 'No se pudo conectar con el servidor. Verifica tu conexión a internet.';
+        errorMessage = '🌐 No se pudo conectar con el servidor. Verifica tu conexión a internet.';
       } else if (error.message.includes('JSON')) {
-        errorMessage = 'Error de comunicación con el servidor';
+        errorMessage = '📡 Error de comunicación con el servidor';
       } else if (error.message.includes('inválida')) {
         errorMessage = error.message;
       } else if (error.message.includes('servidor')) {
@@ -436,15 +534,14 @@ const CarritoPage = () => {
         errorMessage = error.message || 'Error inesperado al procesar la compra';
       }
       
-      toast.error(errorMessage, {
-        autoClose: 5000
+      toast.error(`❌ ${errorMessage}`, {
+        position: "top-center",
+        autoClose: 6000
       });
       
-      // Limpiar datos en caso de error
       localStorage.removeItem('purchaseInfo');
       localStorage.removeItem('transbankToken');
       
-      // Recargar carrito para refrescar estado
       if (fetchCarrito) {
         fetchCarrito(false);
       }
@@ -475,7 +572,7 @@ const CarritoPage = () => {
 
         {error && (
           <div className="carrito-error">
-            <p>{error}</p>
+            <p>❌ {error}</p>
             <button onClick={clearError} className="error-close">×</button>
           </div>
         )}
@@ -560,7 +657,10 @@ const CarritoPage = () => {
 
                       <button 
                         className="item-remove"
-                        onClick={() => handleEliminar(item.id_detalle_producto)}
+                        onClick={() => handleEliminar(
+                          item.id_detalle_producto, 
+                          item.nombre_producto || item.nombre
+                        )}
                         disabled={isLoading}
                         title="Eliminar producto"
                       >
@@ -597,10 +697,9 @@ const CarritoPage = () => {
                       onClick={handleLimpiarCarrito}
                       disabled={isLoading || procesandoCompra}
                     >
-                      Vaciar Carrito
+                      🧹 Vaciar Carrito
                     </button>
                     
-                    {/* 🔥 BOTÓN PRINCIPAL - MUESTRA MODAL DE OPCIONES */}
                     <button 
                       className="btn-comprar"
                       onClick={handleProcederAlPago}
@@ -629,7 +728,7 @@ const CarritoPage = () => {
                     ← Continuar Comprando
                   </button>
 
-                  {/* 🔥 INFORMACIÓN DE PROCESO MEJORADA */}
+                  {/* Información de proceso */}
                   <div className="purchase-process-info" style={{
                     marginTop: '20px',
                     padding: '15px',
@@ -678,7 +777,7 @@ const CarritoPage = () => {
         </div>
       </div>
 
-      {/* 🎯 MODAL DE SELECCIÓN DE MÉTODO DE PAGO COMBINADO */}
+      {/* 🎯 MODAL DE SELECCIÓN DE MÉTODO DE PAGO */}
       {mostrarModalPago && (
         <div className="modal-overlay" onClick={() => setMostrarModalPago(false)}>
           <div className="modal-pago" onClick={(e) => e.stopPropagation()}>
@@ -779,6 +878,40 @@ const CarritoPage = () => {
                     →
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🆕 MODAL DE CONFIRMACIÓN MODERNO */}
+      {modalConfirmacion.mostrar && (
+        <div className="modal-overlay" onClick={cerrarConfirmacion}>
+          <div className="modal-confirmacion" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-confirmacion-header">
+              <div className="confirmacion-icono">
+                {modalConfirmacion.icono}
+              </div>
+              <h3>{modalConfirmacion.titulo}</h3>
+            </div>
+            
+            <div className="modal-confirmacion-body">
+              <p>{modalConfirmacion.mensaje}</p>
+            </div>
+            
+            <div className="modal-confirmacion-footer">
+              <button 
+                className="btn-confirmacion-cancelar"
+                onClick={cerrarConfirmacion}
+              >
+                {modalConfirmacion.textoCancel}
+              </button>
+              <button 
+                className="btn-confirmacion-confirmar"
+                onClick={ejecutarConfirmacion}
+                style={{ backgroundColor: modalConfirmacion.colorConfirmar }}
+              >
+                {modalConfirmacion.textoConfirmar}
               </button>
             </div>
           </div>

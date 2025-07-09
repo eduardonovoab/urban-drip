@@ -102,7 +102,6 @@ export const registerUser = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
-
 export const login = async (req, res) => {
   const { correo, contrasena } = req.body;
 
@@ -146,6 +145,9 @@ export const login = async (req, res) => {
       return res.status(401).json({ message: 'Contraseña incorrecta' });
     }
 
+    // 🔥 CAMBIO AQUÍ: Sin expiración para admin, 1 día para otros
+    const tokenOptions = usuario.rol === 'admin' ? {} : { expiresIn: '1d' };
+    
     const token = jwt.sign(
       {
         id_usuario: usuario.id_usuario,
@@ -153,10 +155,10 @@ export const login = async (req, res) => {
         correo: usuario.correo,
       },
       process.env.JWT_SECRET,
-      { expiresIn: '1d' }
+      tokenOptions
     );
 
-    console.log('Login exitoso para:', correo);
+    console.log('Login exitoso para:', correo, 'Rol:', usuario.rol, 'Token expira:', usuario.rol === 'admin' ? 'NUNCA' : '1 día');
 
     res.json({ 
       token, 
